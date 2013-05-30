@@ -49,6 +49,7 @@ options =
   port:  packages.port || defaults.port || 3000
   env: packages.env || defaults.env || 'development'
   cluster: packages.cluster || defaults.cluster || require('os').cpus().length
+  delay: packages.cluster || defaults.cluster || 250
   logpath: packages.logpath || defaults.logpath || null
   pidpath: packages.pidpath || defaults.pidpath || path.join (path.dirname process.mainModule.filename), '..', 'tmp'
   nocolor: packages.raw || defaults.raw || no
@@ -93,6 +94,9 @@ try
       when '-c', '-cluster', '--cluster'
         options.cluster = parseInt args.shift(), 10
         throw (new Error "#{arg} [INT], number of fork children") if isNaN options.cluster
+      when '-d', '-delay', '--delay'
+        options.delay = parseInt args.shift(), 10
+        throw (new Error "#{arg} [INT], reload delay time (ms)") if isNaN options.delay
       # when '-l', '-logpath', '--logpath'
       #   options.logpath = args.shift()
       when '-P', '-pidpath', '--pidpath'
@@ -159,6 +163,7 @@ if actions.help
       -e, --env [development]  pass environment with `process.env.NODE_ENV`
       -c, --cluster []         concurrent process with cpu threads default
       -P, --pidpath [tmp]      pid file location
+      -D, --delay [250]        delay time on re-fork children
       -n, --nocolor            stop colorize console
       -d, --daemon             daemonize process
       -w, --watch              watch code changes, auto reload programs
@@ -245,7 +250,7 @@ if actions.clear
       console.error "kill #{pid} failed: no such process."
 
 if actions.reload
-  reloadAllChilds 125
+  reloadAllChilds options.delay
 
 if actions.status
   if fs.existsSync pidfile
@@ -319,7 +324,7 @@ if actions.start
             files.push path.resolve dst if isValidCode dst
         return files
       for watch in getAllCodes '.'
-        fs.watch watch, -> reloadAllChilds 250
+        fs.watch watch, -> reloadAllChilds options.delay
 
     fs.writeFileSync pidfile, process.pid
 

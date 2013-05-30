@@ -79,6 +79,8 @@ default development, pass environment (`process.env.NODE_ENV`)
 default number of cpu threads, concurrent process with cluster module
 #### -P, --pidpath [STRING]
 pid file location
+#### -D, --delay [NUMBER]
+default 250, delay time on re-fork children
 #### -n, --nocolor
 stop colorize console
 #### -d, --daemon
