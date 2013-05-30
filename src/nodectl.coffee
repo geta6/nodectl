@@ -9,7 +9,6 @@ fs = require 'fs'
 path = require 'path'
 {print} = require 'util'
 {spawn, exec} = require 'child_process'
-# daemon = require 'daemon'
 cluster = require 'cluster'
 
 # Default Value
@@ -324,7 +323,10 @@ if actions.start
             files.push path.resolve dst if isValidCode dst
         return files
       for watch in getAllCodes '.'
-        fs.watch watch, -> reloadAllChilds options.delay
+        try
+          fs.watch watch, -> reloadAllChilds options.delay
+        catch e
+          console.error "watch #{watch} failed"
 
     fs.writeFileSync pidfile, process.pid
 
