@@ -1,0 +1,24 @@
+{
+  "name": "nodectl",
+  "version": "0.0.1",
+  "description": "supervisor script for node.js",
+  "main": "lib/nodectl.js",
+  "bin": {
+    "nose": "./bin/nodectl"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geta6/nodectl"
+  },
+  "keywords": [
+    "supervisor"
+  ],
+  "dependencies": {
+    "coffee-script": "*"
+  },
+  "author": "geta6",
+  "license": "BSD",
+  "bugs": {
+    "url": "https://github.com/geta6/nodectl/issues"
+  }
+}
