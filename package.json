@@ -4,7 +4,7 @@
   "description": "supervisor script for node.js",
   "main": "lib/nodectl.js",
   "bin": {
-    "nose": "./bin/nodectl"
+    "nodectl": "./bin/nodectl"
   },
   "repository": {
     "type": "git",
