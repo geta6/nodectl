@@ -1,6 +1,6 @@
 {
   "name": "nodectl",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "supervisor script for node.js",
   "main": "lib/nodectl.js",
   "bin": {
