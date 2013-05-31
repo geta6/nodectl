@@ -93,7 +93,7 @@ try
       when '-c', '-cluster', '--cluster'
         options.cluster = parseInt args.shift(), 10
         throw (new Error "#{arg} [INT], number of fork children") if isNaN options.cluster
-      when '-d', '-delay', '--delay'
+      when '-D', '-delay', '--delay'
         options.delay = parseInt args.shift(), 10
         throw (new Error "#{arg} [INT], reload delay time (ms)") if isNaN options.delay
       # when '-l', '-logpath', '--logpath'
@@ -215,6 +215,7 @@ reloadAllChilds = (delay = 0) ->
     for wid, i in (fs.readFileSync widfile, 'utf-8').split ' '
       do (wid, i) ->
         setTimeout ->
+          console.log delay * i
           try
             process.kill wid, 'SIGINT'
           catch e
