@@ -1,6 +1,6 @@
 {
   "name": "nodectl",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "supervisor script for node.js",
   "main": "lib/nodectl.js",
   "bin": {
@@ -14,7 +14,7 @@
     "supervisor"
   ],
   "dependencies": {
-    "coffee-script": "*"
+    "coffee-script": "1.6.3"
   },
   "author": "geta6",
   "license": "BSD",
