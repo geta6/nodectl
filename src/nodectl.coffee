@@ -11,18 +11,21 @@ path = require 'path'
 {spawn, exec} = require 'child_process'
 cluster = require 'cluster'
 
-# Default Value
+PROJECT = path.resolve()
 
-defaults = switch
-  when fs.existsSync path.resolve process.env.HOME, '.nodectl.json'
-    require path.resolve process.env.HOME, '.nodectl.json'
-  else {}
+# Default Value
 
 for dir, i in (path.resolve()).split '/'
   up = ''; up += '../' for j in Array(i)
   if fs.existsSync path.resolve up, 'package.json'
     packages = require path.resolve up, 'package.json'
+    PROJECT = path.resolve up
     break
+
+defaults = switch
+  when fs.existsSync path.join PROJECT, '.nodectl.json'
+    require path.join PROJECT, '.nodectl.json'
+  else {}
 
 noseinfo = require '../package.json'
 packages or=
@@ -35,7 +38,7 @@ args = [].concat process.argv
 
 action = 'start'
 actions =
-  main: packages.main || ''
+  main: defaults.main || packages.main || ''
   stop: no
   start: no
   clear: no
@@ -45,15 +48,15 @@ actions =
   version: no
 
 options =
-  port:  packages.port || defaults.port || 3000
-  env: packages.env || defaults.env || 'development'
-  cluster: packages.cluster || defaults.cluster || require('os').cpus().length
-  delay: packages.cluster || defaults.cluster || 250
-  logpath: packages.logpath || defaults.logpath || null
-  pidpath: packages.pidpath || defaults.pidpath || path.join (path.dirname process.mainModule.filename), '..', 'tmp'
-  nocolor: packages.raw || defaults.raw || no
-  daemon: packages.daemon || defaults.daemon || no
-  watch: packages.watch || defaults.watch || no
+  port: defaults.port || packages.port || 3000
+  env: defaults.env || packages.env || 'development'
+  cluster: defaults.cluster || packages.cluster || require('os').cpus().length
+  delay: defaults.cluster || packages.cluster || 250
+  logpath: defaults.logpath || packages.logpath || null
+  pidpath: defaults.pidpath || packages.pidpath || path.join (path.dirname process.mainModule.filename), '..', 'tmp'
+  nocolor: defaults.nocolor || packages.nocolor || no
+  daemon: defaults.daemon || packages.daemon || no
+  watch: defaults.watch || packages.watch || no
 
 try
   args = [].concat process.argv
@@ -172,8 +175,10 @@ if actions.help
       -h, --help               show this message and exit
 
     Defaults:
-      [options] default from `${HOME}/.noserc.json`
-      <program> default from `package.json: main`
+      Default option values from
+        `${PROJECT_ROOT}/.nodectl.json`
+        `${PROJECT_ROOT}/package.json`
+      Main script key is `main`
     """
   process.exit 1
 

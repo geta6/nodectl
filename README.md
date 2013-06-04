@@ -118,12 +118,14 @@ show version and exit
 show help message and exit
 
 ## Defaults
-  * `[options]` default from `${HOME}/.noserc.json`
-  * `<program>` default from `package.json: main`
+  * Default option values from
+    * `${PROJECT_ROOT}/.nodesrc.json`
+    * `${PROJECT_ROOT}/package.json`
+  * Main script key is `main`
 
 ## package.json search
   nodectl automatically search nearest `package.json` form parent directories.
 
   * application name from `package.json: name`
   * application version from `package.json: version`
-  * application main script from `package.json: main`
+  * application main script from `package.json: main` or `.nodectl.json: main`
