@@ -256,7 +256,6 @@ reloadAllChilds = (delay = 0) ->
     for wid, i in (fs.readFileSync widfile, 'utf-8').split ' '
       do (wid, i) ->
         setTimeout ->
-          console.log delay * i
           try
             process.kill wid, 'SIGINT'
           catch e
