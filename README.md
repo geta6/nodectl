@@ -118,8 +118,8 @@ show version and exit
 show help message and exit
 
 ## Defaults
-  * [options] default from `${HOME}/.noserc.json`
-  * <program> default from `package.json: main`
+  * `[options]` default from `${HOME}/.noserc.json`
+  * `<program>` default from `package.json: main`
 
 ## package.json search
   nodectl automatically search nearest `package.json` form parent directories.
