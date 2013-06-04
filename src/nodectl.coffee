@@ -96,8 +96,8 @@ try
       when '-D', '-delay', '--delay'
         options.delay = parseInt args.shift(), 10
         throw (new Error "#{arg} [INT], reload delay time (ms)") if isNaN options.delay
-      # when '-l', '-logpath', '--logpath'
-      #   options.logpath = args.shift()
+      when '-l', '-logpath', '--logpath'
+        options.logpath = args.shift()
       when '-P', '-pidpath', '--pidpath'
         options.pidpath = args.shift()
       when '-n', '-nocolor', '--nocolor'
@@ -161,8 +161,9 @@ if actions.help
       -p, --port [3000]        pass listening port with `process.env.PORT`
       -e, --env [development]  pass environment with `process.env.NODE_ENV`
       -c, --cluster []         concurrent process with cpu threads default
-      -P, --pidpath [tmp]      pid file location
-      -D, --delay [250]        delay time on re-fork children
+      -P, --pidpath [tmp]      directory for pid files
+      -l, --logpath []         directory for log files
+      -D, --delay [250]        delay time for re-fork child workers
       -n, --nocolor            stop colorize console
       -d, --daemon             daemonize process
       -w, --watch              watch code changes, auto reload programs
@@ -197,6 +198,8 @@ if options.test
       -e, --env #{options.env}
       -c, --cluster #{options.cluster}
       -P, --pidpath #{options.pidpath}
+      -l, --logpath #{options.logpath}
+      -D, --delay #{options.delay}
       -n, --nocolor #{options.nocolor}
       -d, --daemon #{options.daemon}
       -w, --watch #{options.watch}
@@ -208,6 +211,39 @@ unless fs.existsSync options.pidpath
 
 pidfile = path.join "#{options.pidpath}", "#{packages.name}.pid"
 widfile = path.join "#{options.pidpath}", "#{packages.name}.wid"
+
+if options.logpath
+  unless fs.existsSync options.logpath
+    fs.mkdirSync path.join options.logpath
+
+stream = no
+if options.logpath
+  stream =
+    master: fs.createWriteStream (path.join "#{options.logpath}", "master.log"), flags: 'a'
+    masterErr: fs.createWriteStream (path.join "#{options.logpath}", "master.error.log"), flags: 'a'
+    worker: fs.createWriteStream (path.join "#{options.logpath}", "worker.log"), flags: 'a'
+    workerErr: fs.createWriteStream (path.join "#{options.logpath}", "worker.error.log"), flags: 'a'
+else
+  options.logpath = null
+
+logger = (control, isMaster = no) ->
+  if stream
+    stdout = control.stdout.write
+    stderr = control.stderr.write
+    if isMaster
+      control.stdout.write = ->
+        stdout.apply @, arguments
+        stream.master.write (arguments[0].replace /\x1b.*?m/g, '')
+      control.stderr.write = ->
+        stderr.apply @, arguments
+        stream.masterErr.write (arguments[0].replace /\x1b.*?m/g, '')
+    else
+      control.stdout.write = ->
+        stdout.apply @, arguments
+        stream.worker.write (arguments[0].replace /\x1b.*?m/g, '')
+      control.stderr.write = ->
+        stderr.apply @, arguments
+        stream.workerErr.write (arguments[0].replace /\x1b.*?m/g, '')
 
 reloadAllChilds = (delay = 0) ->
   console.info '>>> Reload all childs.'
@@ -274,7 +310,10 @@ if actions.start
     console.log "  concurrent      ... #{options.cluster}"
     console.log "  daemonize       ... #{options.daemon}"
     console.log "  watchmode       ... #{options.watch}"
-    console.log "  pidfile         ... #{pidfile}"
+    console.log "  colorlize       ... #{!options.nocolor}"
+    console.log "  releaseDelay    ... #{options.delay}"
+    console.log "  logpath         ... #{options.logpath}"
+    console.log "  pidfile         ... #{pidfile}\n"
 
     workers = []
 
@@ -331,10 +370,15 @@ if actions.start
 
     fs.writeFileSync pidfile, process.pid
 
+    process.stdout.pipe(process.stdin)
+
     process.on 'exit', ->
       fs.unlinkSync pidfile if fs.existsSync pidfile
       fs.unlinkSync widfile if fs.existsSync widfile
     process.on 'SIGINT', -> process.exit 0
 
+    logger process, yes
+
   else
     require path.join process.cwd(), actions.main
+    logger process, no
