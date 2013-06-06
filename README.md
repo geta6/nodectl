@@ -19,9 +19,11 @@ supervisor sctipt for nodejs.
 * `start-stop-daemon`のような命令系統
 * 最近傍の`package.json`を探索、`name`, `version`, `main`と言った情報を取得
 * 最近傍の`package.json`からキー名を探索、ロングオプションと同値のキーをデフォルト値としてロード
+* `package.json`と同一ディレクトリにある`.nodectl.json`の値を読み、設定値をロード
+* オプションで渡した値が最優先され、次に`.nodectl.json`、次に`package.json`、次にデフォルト値、という順番で評価
 * `PORT`や`NODE_ENV`などの環境変数値を`undefined`のまま実行しない
 * 現在の引数でどのような動作が期待されるかテストするモード
-* 手動で設定する場合は`action`を用い、自動で設定する場合は`option`を用いる
+* crontabのように動作するスクリプトなど、単一のインスタンスのみで実行されることを期待するスクリプトの指定
 
 ## Features
 
@@ -125,7 +127,7 @@ show help message and exit
 
 ## Defaults
   * Default option values from
-    * `${PROJECT_ROOT}/.nodesrc.json`
+    * `${PROJECT_ROOT}/.nodectl.json`
     * `${PROJECT_ROOT}/package.json`
   * Main script key is `main`
 
