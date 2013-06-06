@@ -54,6 +54,7 @@ options =
   delay: defaults.cluster || packages.cluster || 250
   logpath: defaults.logpath || packages.logpath || null
   pidpath: defaults.pidpath || packages.pidpath || path.join (path.dirname process.mainModule.filename), '..', 'tmp'
+  execmaster: defaults.execmaster || packages.execmaster || no
   nocolor: defaults.nocolor || packages.nocolor || no
   daemon: defaults.daemon || packages.daemon || no
   watch: defaults.watch || packages.watch || no
@@ -103,6 +104,8 @@ try
         options.logpath = args.shift()
       when '-P', '-pidpath', '--pidpath'
         options.pidpath = args.shift()
+      when '-x', '-execmaster', '--execmaster'
+        options.execmaster = args.shift()
       when '-n', '-nocolor', '--nocolor'
         options.nocolor = yes
       when '-d', '-daemon', '--daemon'
@@ -167,6 +170,7 @@ if actions.help
       -P, --pidpath [tmp]      directory for pid files
       -l, --logpath []         directory for log files
       -D, --delay [250]        delay time for re-fork child workers
+      -x, --execmaster []      execute script on master process
       -n, --nocolor            stop colorize console
       -d, --daemon             daemonize process
       -w, --watch              watch code changes, auto reload programs
@@ -205,6 +209,7 @@ if options.test
       -P, --pidpath #{options.pidpath}
       -l, --logpath #{options.logpath}
       -D, --delay #{options.delay}
+      -x, --execmaster #{options.execmaster}
       -n, --nocolor #{options.nocolor}
       -d, --daemon #{options.daemon}
       -w, --watch #{options.watch}
@@ -317,6 +322,7 @@ if actions.start
     console.log "  colorlize       ... #{!options.nocolor}"
     console.log "  releaseDelay    ... #{options.delay}"
     console.log "  logpath         ... #{options.logpath}"
+    console.log "  execmaster      ... #{options.execmaster}"
     console.log "  pidfile         ... #{pidfile}\n"
 
     workers = []
@@ -340,6 +346,22 @@ if actions.start
       workers.push cluster.fork().process.pid
     fs.writeFileSync widfile, workers.join ' '
 
+    isFile = (file) -> return fs.statSync(file).isFile()
+    isDir  = (dir) -> return fs.statSync(dir).isDirectory()
+    isCode = (file) -> /\.(coffee|js|json)$/.test path.extname file
+
+    if options.execmaster
+      options.execmaster = path.join process.cwd(), options.execmaster
+      if !fs.existsSync options.execmaster
+        console.error "-x --execmaster '#{options.execmaster}' not exists"
+        process.exit 1
+      if !isFile options.execmaster
+        console.error "-x --execmaster '#{options.execmaster}' not file"
+        process.exit 1
+      if !(isCode options.execmaster)
+        console.error "-x --execmaster '#{options.execmaster}' not script"
+        process.exit 1
+
     if options.daemon
       unless process.env.__daemon
         args = [].concat process.argv
@@ -355,22 +377,23 @@ if actions.start
         process.exit()
 
     if options.watch
-      isDirectory = (dir) -> return fs.statSync(dir).isDirectory()
-      isValidCode = (file) -> /\.(coffee|js|json)$/.test path.extname file
       getAllCodes = (dir) ->
         files = []
         for src in fs.readdirSync dir
           dst = path.join dir, src
-          if (dst isnt 'node_modules') and (isDirectory dst)
+          if (dst isnt 'node_modules') and (isDir dst)
             files = files.concat getAllCodes dst
           else unless /^\./.test src
-            files.push path.resolve dst if isValidCode dst
+            files.push path.resolve dst if isCode dst
         return files
       for watch in getAllCodes '.'
         try
           fs.watch watch, -> reloadAllChilds options.delay
         catch e
           console.error "watch #{watch} failed"
+
+    if options.execmaster
+      require options.execmaster
 
     fs.writeFileSync pidfile, process.pid
 

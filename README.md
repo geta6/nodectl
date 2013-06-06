@@ -57,6 +57,10 @@ nodectl -d app.js
 ```
 nodectl -d -w app.js
 ```
+### clock works (ex. crontab like action)
+```
+nodectl -x clock.js
+```
 ### stop daemon
 ```
 cd ~/test
@@ -104,6 +108,8 @@ directory for pid files
 directory for log files
 #### -D, --delay [NUMBER]
 default 250, delay time for re-fork child workers
+#### -x, --execmaster [STRING]
+execute script on master process (single instance)
 #### -n, --nocolor
 stop colorize console
 #### -d, --daemon
