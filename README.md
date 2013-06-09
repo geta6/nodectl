@@ -137,3 +137,84 @@ show help message and exit
   * application name from `package.json: name`
   * application version from `package.json: version`
   * application main script from `package.json: main` or `.nodectl.json: main`
+
+## Tips
+
+### automatically setting
+
+```sh
+$ cd $PROJECT_ROOT
+$ cat .nodectl.json
+{
+  "main": "app.coffee",
+  "env": "development",
+  "execmaster": "config/clock.coffee",
+  "cluster": "1",
+  "watch": true,
+  "daemonize": false
+}
+```
+
+### prevent master process down from execmaster
+
+```coffee
+$ cd $PROJECT_ROOT
+$ cat config/clock.coffee
+
+fs= require 'fs'
+path = require 'path'
+async = require 'async'
+{spawn} = require 'child_process'
+
+if 'nodectl' is path.basename process.argv[1]
+
+  # Manager - spawn myself
+
+  setInterval ->
+    args = [path.join process.cwd(), 'config/clock.coffee']
+    spawn './node_modules/coffee-script/bin/coffee', args,
+      stdio: 'inherit'
+      env: process.env
+      cwd: process.cwd()
+      detached: yes
+  , 1000
+
+else
+
+  # Worker - spawned process section
+
+  app = require './app.coffee'
+  {File} = app.get 'models'
+
+  root_dir = '/media'
+
+  fs.readdir root_dir, (err, list) ->
+    async.map list, (name, next) ->
+      filepath = path.join root_dir, name
+      File.find path: filepath, {}, {}, (err, file) ->
+        stat = fs.statSync filepath
+        unless file
+          file = new File()
+        if (String file.mtime) isnt (String stat.mtime)
+           file.path = filepath
+          file.stat = stat
+        file.save next
+    , (err) ->
+      if err
+        console.error err 
+        process.exit 1
+      process.exit 0
+```
+
+## release
+
+```sh
+$ cd $PROJECT_ROOT
+$ cat .nodectl.json
+{
+  "main": "app.coffee",
+  "env": "production",
+  "execmaster": "config/clock.coffee",
+  "daemonize": true
+}
+```
