@@ -413,7 +413,8 @@ if actions.start
               try
                 startTime = new Date()
                 code = ''
-                dest = path.join options.output, watch.replace options.assets, ''
+                dest = path.join options.output, watch.replace (path.resolve options.assets), ''
+                console.log dest
                 unless fs.exists path.dirname dest
                   mkdirp.sync path.dirname dest
                 if /\.(js|coffee)$/.test watch
