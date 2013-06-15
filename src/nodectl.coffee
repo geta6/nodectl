@@ -89,7 +89,6 @@ try
         action = 'restart'
         actions.start = yes
         actions.stop = yes
-        options.daemon = yes
       when 'force-clear', 'force_clear'
         action = 'force-clear'
         actions.start = no
