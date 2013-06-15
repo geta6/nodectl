@@ -383,10 +383,21 @@ if actions.start
           files.push path.resolve dst if pattern.test dst
       return files
 
+    escapeRegExp = (string) ->
+      string.replace(/([.*+?^${}()|[\]\/\\])/g, '\\$1')
+
     if options.watch
       for watch in findsByExtPattern '.', /\.(js|coffee|json)$/
         do (watch) ->
-          unless (new RegExp "^#{options.assets}").test watch
+          matchAssets = no
+          matchOutput = no
+          if options.assets
+            regexAssets = new RegExp "^#{escapeRegExp path.resolve options.assets}.*"
+            matchAssets = regexAssets.test watch
+          if options.output
+            regexOutput = new RegExp "^#{escapeRegExp path.resolve options.output}.*"
+            matchOutput = regexOutput.test watch
+          if !matchAssets and !matchOutput
             try
               fs.watch watch, ->
                 console.info ">> Script updated."
