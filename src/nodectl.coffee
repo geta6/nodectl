@@ -264,17 +264,18 @@ reloadAllChilds = (delay = 0) ->
     console.error 'widfile missing.'
 
 if actions.stop
-  if fs.existsSync pidfile
-    pid = parseInt (fs.readFileSync pidfile, 'utf-8'), 10
-    try
-      process.kill pid, 'SIGINT'
-      console.log "#{packages.name} stopped."
-      fs.unlinkSync pidfile if fs.existsSync pidfile
-      fs.unlinkSync widfile if fs.existsSync widfile
-    catch e
-      console.error "kill #{pid} failed: no such process."
-  else
-    console.error "#{packages.name} not running, pidfile not exists."
+  if cluster.isMaster
+    if fs.existsSync pidfile
+      pid = parseInt (fs.readFileSync pidfile, 'utf-8'), 10
+      try
+        process.kill pid, 'SIGINT'
+        console.log "#{packages.name} stopped."
+        fs.unlinkSync pidfile if fs.existsSync pidfile
+        fs.unlinkSync widfile if fs.existsSync widfile
+      catch e
+        console.error "kill #{pid} failed: no such process."
+    else
+      console.error "#{packages.name} not running, pidfile not exists."
 
 if actions.clear
   console.warn "clear pidfile for #{packages.name}."
