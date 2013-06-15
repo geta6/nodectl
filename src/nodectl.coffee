@@ -1,6 +1,7 @@
-# Coffee Script
+# Compiler
 
-require 'coffee-script'
+coffee = require 'coffee-script'
+stylus = require 'stylus'
 
 
 # Variable
@@ -10,6 +11,14 @@ path = require 'path'
 {print} = require 'util'
 {spawn, exec} = require 'child_process'
 cluster = require 'cluster'
+crypto = require 'crypto'
+
+shasum = (source) ->
+  return crypto.createHash('sha1').update(source).digest 'hex'
+
+mkdirp = require 'mkdirp'
+uglify = require 'uglify-js'
+sqwish = require 'sqwish'
 
 PROJECT = path.resolve()
 
@@ -58,6 +67,9 @@ options =
   nocolor: defaults.nocolor || packages.nocolor || no
   daemon: defaults.daemon || packages.daemon || no
   watch: defaults.watch || packages.watch || no
+  assets: defaults.assets || packages.assets || null
+  output: defaults.output || packages.output || null
+  minify: defaults.minify || packages.minify || no
 
 try
   args = [].concat process.argv
@@ -112,8 +124,14 @@ try
         options.daemon = yes
       when '-w', '-watch', '--watch'
         options.watch = yes
-      when '-t', '-test', '--test'
-        options.test = yes
+      when '-a', '--assets'
+        assets = path.resolve args.shift()
+        options.assets = assets if fs.existsSync assets
+      when '-o', '--output'
+        output = path.resolve args.shift()
+        options.output = output if fs.existsSync output
+      when '-m', '--minify'
+        options.minify = yes
       when '-v', '-version', '--version'
         actions.version = yes
       when '-h', '-help', '--help'
@@ -167,53 +185,29 @@ if actions.help
       -p, --port [3000]        pass listening port with `process.env.PORT`
       -e, --env [development]  pass environment with `process.env.NODE_ENV`
       -c, --cluster []         concurrent process with cpu threads default
-      -P, --pidpath [tmp]      directory for pid files
-      -l, --logpath []         directory for log files
-      -D, --delay [250]        delay time for re-fork child workers
-      -x, --execmaster []      execute script on master process
-      -n, --nocolor            stop colorize console
+
       -d, --daemon             daemonize process
       -w, --watch              watch code changes, auto reload programs
-      -t, --test               check options (not execute)
+      -D, --delay [250]        delay time for re-fork child workers
+      -n, --nocolor            stop colorize console
+
+      -P, --pidpath [(auto)]   directory for pid files
+      -l, --logpath []         directory for log files
+      -x, --execmaster []      execute script on master process
+
+      -a, --assets []          directory for assets watch and compile (js, coffee, css, styl)
+      -o, --output []          directory for output js/css
+      -m, --minify             minify compiled assets
+
       -v, --version            show version and exit
       -h, --help               show this message and exit
 
-    Defaults:
-      Default option values from
-        `${PROJECT_ROOT}/.nodectl.json`
-        `${PROJECT_ROOT}/package.json`
-      Main script key is `main`
+    Defaults from : `.nodectl.json` or `package.json`
     """
   process.exit 1
 
 if actions.version
   console.log "#{noseinfo.name} version #{noseinfo.version}"
-  process.exit 1
-
-if options.test
-  console.log """
-    #{noseinfo.name} version #{noseinfo.version}
-
-    ----- Test mode -----
-
-    Target:
-      #{packages.name} version #{packages.version}
-
-    Selected action:
-      #{action}
-
-    Options:
-      -p, --port #{options.port}
-      -e, --env #{options.env}
-      -c, --cluster #{options.cluster}
-      -P, --pidpath #{options.pidpath}
-      -l, --logpath #{options.logpath}
-      -D, --delay #{options.delay}
-      -x, --execmaster #{options.execmaster}
-      -n, --nocolor #{options.nocolor}
-      -d, --daemon #{options.daemon}
-      -w, --watch #{options.watch}
-    """
   process.exit 1
 
 unless fs.existsSync options.pidpath
@@ -321,8 +315,11 @@ if actions.start
     console.log "  watchmode       ... #{options.watch}"
     console.log "  colorlize       ... #{!options.nocolor}"
     console.log "  releaseDelay    ... #{options.delay}"
-    console.log "  logpath         ... #{options.logpath}"
     console.log "  execmaster      ... #{options.execmaster}"
+    console.log "  assets          ... #{options.assets}"
+    console.log "  output          ... #{options.output}"
+    console.log "  minify          ... #{options.minify}"
+    console.log "  logpath         ... #{options.logpath}"
     console.log "  pidfile         ... #{pidfile}\n"
 
     workers = []
@@ -376,21 +373,70 @@ if actions.start
         child.unref()
         process.exit()
 
+    findsByExtPattern = (dir, pattern) ->
+      files = []
+      for src in fs.readdirSync dir
+        dst = path.join dir, src
+        if (dst isnt 'node_modules') and (isDir dst)
+          files = files.concat findsByExtPattern dst, pattern
+        else unless /^\./.test src
+          files.push path.resolve dst if pattern.test dst
+      return files
+
     if options.watch
-      getAllCodes = (dir) ->
-        files = []
-        for src in fs.readdirSync dir
-          dst = path.join dir, src
-          if (dst isnt 'node_modules') and (isDir dst)
-            files = files.concat getAllCodes dst
-          else unless /^\./.test src
-            files.push path.resolve dst if isCode dst
-        return files
-      for watch in getAllCodes '.'
-        try
-          fs.watch watch, -> reloadAllChilds options.delay
-        catch e
-          console.error "watch #{watch} failed"
+      for watch in findsByExtPattern '.', /\.(js|coffee|json)$/
+        do (watch) ->
+          unless (new RegExp "^#{options.assets}").test watch
+            try
+              fs.watch watch, ->
+                console.info ">> Script updated."
+                reloadAllChilds options.delay
+            catch e
+              console.error "Watch script #{watch} failed"
+
+    if options.assets and options.output
+      for watch in findsByExtPattern options.assets, /\.(js|coffee|styl)$/
+        do (watch) ->
+          console.log watch
+          try
+            fs.watch watch, ->
+              try
+                startTime = new Date()
+                code = ''
+                dest = path.join options.output, watch.replace options.assets, ''
+                unless fs.exists path.dirname dest
+                  mkdirp.sync path.dirname dest
+                if /\.(js|coffee)$/.test watch
+                  dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.js'
+                  code = switch path.extname watch
+                    when '.coffee'
+                      coffee.compile fs.readFileSync watch, 'utf-8'
+                    else
+                      fs.readFileSync watch, 'utf-8'
+                  if options.minify
+                    temp = path.join '/tmp', shasum (Date.now()).toString()
+                    fs.writeFileSync temp, code
+                    {code} = uglify.minify temp
+                    fs.unlinkSync temp
+                if /\.(css|styl)$/.test watch
+                  dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.css'
+                  code = switch path.extname watch
+                    when '.styl'
+                      (stylus fs.readFileSync watch, 'utf-8')
+                        .set('paths', [(path.resolve 'node_modules'), (options.assets)])
+                        .render()
+                    else
+                      fs.readFileSync watch, 'utf-8'
+                  if options.minify
+                    code = sqwish.minify code
+                if code
+                  fs.writeFileSync dest, code, 'utf-8'
+                  console.info ">> #{path.basename dest} compiled. (#{new Date() - startTime}ms)"
+              catch e
+                console.error ">> Compile failure."
+                console.error e.message
+          catch e
+            console.error ">> Watch asset #{watch} failed"
 
     if options.execmaster
       require options.execmaster
