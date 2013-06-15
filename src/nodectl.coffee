@@ -397,7 +397,6 @@ if actions.start
     if options.assets and options.output
       for watch in findsByExtPattern options.assets, /\.(js|coffee|styl)$/
         do (watch) ->
-          console.log watch
           try
             fs.watch watch, ->
               try
