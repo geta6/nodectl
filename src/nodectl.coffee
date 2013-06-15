@@ -414,7 +414,6 @@ if actions.start
                 startTime = new Date()
                 code = ''
                 dest = path.join options.output, watch.replace (path.resolve options.assets), ''
-                console.log dest
                 unless fs.exists path.dirname dest
                   mkdirp.sync path.dirname dest
                 if /\.(js|coffee)$/.test watch
