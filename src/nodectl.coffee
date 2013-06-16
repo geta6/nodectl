@@ -2,7 +2,7 @@
 
 coffee = require 'coffee-script'
 stylus = require 'stylus'
-
+jade = require 'jade'
 
 # Variable
 
@@ -19,6 +19,7 @@ shasum = (source) ->
 mkdirp = require 'mkdirp'
 uglify = require 'uglify-js'
 sqwish = require 'sqwish'
+markup = require 'html-minifier'
 
 PROJECT = path.resolve()
 
@@ -70,6 +71,7 @@ options =
   assets: defaults.assets || packages.assets || null
   output: defaults.output || packages.output || null
   minify: defaults.minify || packages.minify || no
+  verbose: defaults.verbose || packages.verbose || no
 
 try
   args = [].concat process.argv
@@ -123,17 +125,19 @@ try
         options.daemon = yes
       when '-w', '-watch', '--watch'
         options.watch = yes
-      when '-a', '--assets'
+      when '-a', '-assets', '--assets'
         assets = path.resolve args.shift()
         options.assets = assets if fs.existsSync assets
-      when '-o', '--output'
+      when '-o', '-output', '--output'
         output = path.resolve args.shift()
         options.output = output if fs.existsSync output
-      when '-m', '--minify'
+      when '-m', '-minify', '--minify'
         options.minify = yes
+      when '-V', '-verbose', '--verbose'
+        options.verbose = yes
       when '-v', '-version', '--version'
         actions.version = yes
-      when '-h', '-help', '--help'
+      when '-h', '-help', '--help', 'help'
         actions.help = yes
       else
         actions.main = arg
@@ -166,6 +170,9 @@ if actions.help
   console.log """
     #{noseinfo.name} version #{noseinfo.version}
 
+    Repo:
+      https://github.com/geta6/nodectl
+
     Target:
       #{packages.name} version #{packages.version}
 
@@ -179,29 +186,25 @@ if actions.help
       force-clear  force clear pid
       reload       apply edited javascript
       status       check <program> running or not
+      help         show this message and exit
 
     Options:
       -p, --port [3000]        pass listening port with `process.env.PORT`
       -e, --env [development]  pass environment with `process.env.NODE_ENV`
       -c, --cluster []         concurrent process with cpu threads default
-
       -d, --daemon             daemonize process
       -w, --watch              watch code changes, auto reload programs
       -D, --delay [250]        delay time for re-fork child workers
       -n, --nocolor            stop colorize console
-
       -P, --pidpath [(auto)]   directory for pid files
       -l, --logpath []         directory for log files
       -x, --execmaster []      execute script on master process
-
-      -a, --assets []          directory for assets watch and compile (js, coffee, css, styl)
+      -a, --assets []          directory for assets watch and compile (js, coffee, css, styl, html, jade)
       -o, --output []          directory for output js/css
       -m, --minify             minify compiled assets
-
+      -V, --verbose            show verbose information on launch and compiled
       -v, --version            show version and exit
       -h, --help               show this message and exit
-
-    Defaults from : `.nodectl.json` or `package.json`
     """
   process.exit 1
 
@@ -308,19 +311,29 @@ if actions.start
       process.exit 1
 
     console.log "#{packages.name} version #{packages.version}"
-    console.log "  listening port  ... #{options.port}"
-    console.log "  environment     ... #{options.env}"
-    console.log "  concurrent      ... #{options.cluster}"
-    console.log "  daemonize       ... #{options.daemon}"
-    console.log "  watchmode       ... #{options.watch}"
-    console.log "  colorlize       ... #{!options.nocolor}"
-    console.log "  releaseDelay    ... #{options.delay}"
-    console.log "  execmaster      ... #{options.execmaster}"
-    console.log "  assets          ... #{options.assets}"
-    console.log "  output          ... #{options.output}"
-    console.log "  minify          ... #{options.minify}"
-    console.log "  logpath         ... #{options.logpath}"
-    console.log "  pidfile         ... #{pidfile}\n"
+    if options.verbose
+      console.log ""
+      if fs.existsSync path.join PROJECT, '.nodectl.json'
+        console.log ">>> .nodectl.json exists"
+      else
+        console.log ">>> .nodectl.json NOT exists"
+      console.log ""
+      console.log ">>> Param:"
+      console.log ">>>   listening port  ... #{options.port}"
+      console.log ">>>   environment     ... #{options.env}"
+      console.log ">>>   concurrent      ... #{options.cluster}"
+      console.log ">>>   daemonize       ... #{options.daemon}"
+      console.log ">>>   watchmode       ... #{options.watch}"
+      console.log ">>>   colorlize       ... #{!options.nocolor}"
+      console.log ">>>   releaseDelay    ... #{options.delay}"
+      console.log ">>>   execmaster      ... #{options.execmaster}"
+      console.log ">>>   assets          ... #{options.assets}"
+      console.log ">>>   output          ... #{options.output}"
+      console.log ">>>   minify          ... #{options.minify}"
+      console.log ">>>   logpath         ... #{options.logpath}"
+      console.log ">>>   pidpath         ... #{options.pidpath}"
+      console.log ">>>   pidfile         ... #{pidfile}"
+      console.log ""
 
     workers = []
 
@@ -361,6 +374,8 @@ if actions.start
 
     if options.daemon
       unless process.env.__daemon
+        if options.verbose
+          console.log ">>> Daemonize process"
         args = [].concat process.argv
         args.shift()
         args.shift()
@@ -389,64 +404,87 @@ if actions.start
     if options.watch
       for watch in findsByExtPattern '.', /\.(js|coffee|json)$/
         do (watch) ->
-          matchAssets = no
-          matchOutput = no
-          if options.assets
-            regexAssets = new RegExp "^#{escapeRegExp path.resolve options.assets}.*"
-            matchAssets = regexAssets.test watch
-          if options.output
-            regexOutput = new RegExp "^#{escapeRegExp path.resolve options.output}.*"
-            matchOutput = regexOutput.test watch
-          if !matchAssets and !matchOutput
-            try
-              fs.watch watch, ->
-                console.info ">> Script updated."
-                reloadAllChilds options.delay
-            catch e
-              console.error "Watch script #{watch} failed"
+          if isFile watch
+            matchAssets = no
+            matchOutput = no
+            if options.assets
+              regexAssets = new RegExp "^#{escapeRegExp path.resolve options.assets}.*"
+              matchAssets = regexAssets.test watch
+            if options.output
+              regexOutput = new RegExp "^#{escapeRegExp path.resolve options.output}.*"
+              matchOutput = regexOutput.test watch
+            if !matchAssets and !matchOutput
+              try
+                if options.verbose
+                  console.log ">>> [Script] Now wathing '#{watch}'"
+                fs.watch watch, ->
+                  if options.verbose
+                    console.log ">>> [Script] Updated '#{watch}'"
+                  console.info ">> Script updated."
+                  reloadAllChilds options.delay
+              catch e
+                console.error "Watch script #{watch} failed"
 
     if options.assets and options.output
       for watch in findsByExtPattern options.assets, /\.(js|coffee|styl)$/
         do (watch) ->
-          try
-            fs.watch watch, ->
-              try
-                startTime = new Date()
-                code = ''
-                dest = path.join options.output, watch.replace (path.resolve options.assets), ''
-                unless fs.exists path.dirname dest
-                  mkdirp.sync path.dirname dest
-                if /\.(js|coffee)$/.test watch
-                  dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.js'
-                  code = switch path.extname watch
-                    when '.coffee'
-                      coffee.compile fs.readFileSync watch, 'utf-8'
-                    else
-                      fs.readFileSync watch, 'utf-8'
-                  if options.minify
-                    temp = path.join '/tmp', shasum (Date.now()).toString()
-                    fs.writeFileSync temp, code
-                    {code} = uglify.minify temp
-                    fs.unlinkSync temp
-                if /\.(css|styl)$/.test watch
-                  dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.css'
-                  code = switch path.extname watch
-                    when '.styl'
-                      (stylus fs.readFileSync watch, 'utf-8')
-                        .set('paths', [(path.resolve 'node_modules'), (options.assets)])
-                        .render()
-                    else
-                      fs.readFileSync watch, 'utf-8'
-                  if options.minify
-                    code = sqwish.minify code
-                if code
-                  fs.writeFileSync dest, code, 'utf-8'
-                  console.info ">> #{path.basename dest} compiled. (#{new Date() - startTime}ms)"
-              catch e
-                console.error ">> Compile failure."
-                console.error e.message
-          catch e
-            console.error ">> Watch asset #{watch} failed"
+          if isFile watch
+            try
+              if options.verbose
+                console.log ">>> [Assets] Now wathing '#{watch}'"
+              fs.watch watch, ->
+                try
+                  startTime = new Date()
+                  code = ''
+                  dest = path.resolve path.join options.output, watch.replace (path.resolve options.assets), ''
+                  unless fs.exists path.dirname dest
+                    mkdirp.sync path.dirname dest
+                  if /\.(js|coffee)$/.test watch
+                    dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.js'
+                    code = switch path.extname watch
+                      when '.coffee'
+                        coffee.compile fs.readFileSync watch, 'utf-8'
+                      else
+                        fs.readFileSync watch, 'utf-8'
+                    if options.minify
+                      temp = path.join '/tmp', shasum (Date.now()).toString()
+                      fs.writeFileSync temp, code
+                      {code} = uglify.minify temp
+                      fs.unlinkSync temp
+                  if /\.(css|styl)$/.test watch
+                    dest = path.resolve path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.css'
+                    code = switch path.extname watch
+                      when '.styl'
+                        (stylus fs.readFileSync watch, 'utf-8')
+                          .set('paths', [(path.resolve 'node_modules'), (options.assets)])
+                          .render()
+                      else
+                        fs.readFileSync watch, 'utf-8'
+                    if options.minify
+                      code = sqwish.minify code
+                  if /\.(html|jade)$/.test watch
+                    dest = path.resolve path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.html'
+                    code = switch path.extname watch
+                      when '.jade'
+                        (jade.compile((fs.readFileSync watch, 'utf-8')))()
+                      else
+                        fs.readFileSync watch, 'utf-8'
+                    if options.minify
+                      code = markup.minify code
+                  if code
+                    fs.writeFileSync dest, code, 'utf-8'
+                    if options.verbose
+                      console.log ">>> #{watch} -> #{dest}"
+                      if options.minify
+                        console.log ">>> code minified."
+                    console.info ">> #{path.basename dest} compiled. (#{new Date() - startTime}ms)"
+                catch e
+                  console.error ">> Failure to compile."
+                  console.error e.message
+            catch e
+              console.error ">> Watch asset #{watch} failed"
+
+    console.log ""
 
     if options.execmaster
       require options.execmaster
