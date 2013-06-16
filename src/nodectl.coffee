@@ -170,8 +170,8 @@ if actions.help
   console.log """
     #{noseinfo.name} version #{noseinfo.version}
 
-    Repo:
-      https://github.com/geta6/nodectl
+    How to use:
+      http://geta6.github.io/nodectl/
 
     Target:
       #{packages.name} version #{packages.version}
@@ -487,7 +487,18 @@ if actions.start
     console.log ""
 
     if options.execmaster
-      require options.execmaster
+      scriptbin = switch path.extname options.execmaster
+        when '.coffee'
+          './node_modules/coffee-script/bin/coffee'
+        else
+          'node'
+      if options.verbose
+        console.log ">>> Execmaster spawned '#{options.execmaster}'"
+      spawn scriptbin, [options.execmaster],
+        stdio: 'inherit'
+        env: process.env
+        cwd: process.cwd()
+        detached: yes
 
     fs.writeFileSync pidfile, process.pid
 

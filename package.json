@@ -1,6 +1,6 @@
 {
   "name": "nodectl",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "supervisor script for node.js",
   "main": "lib/nodectl.js",
   "bin": {
@@ -24,6 +24,7 @@
   },
   "author": "geta6",
   "license": "BSD",
+  "readme": "http://geta6.github.io/nodectl/",
   "bugs": {
     "url": "https://github.com/geta6/nodectl/issues"
   }
