@@ -426,7 +426,7 @@ if actions.start
                 console.error "Watch script #{watch} failed"
 
     if options.assets and options.output
-      for watch in findsByExtPattern options.assets, /\.(js|coffee|styl)$/
+      for watch in findsByExtPattern options.assets, /\.(js|coffee|css|styl|html|jade)$/
         do (watch) ->
           if isFile watch
             try

@@ -14,7 +14,6 @@
     "supervisor"
   ],
   "dependencies": {
-    "jshint": "2.1.3",
     "coffee-script": "1.6.3",
     "stylus": "0.32.1",
     "jade": "0.31.2",
