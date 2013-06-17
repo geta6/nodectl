@@ -502,8 +502,6 @@ if actions.start
 
     fs.writeFileSync pidfile, process.pid
 
-    process.stdout.pipe(process.stdin)
-
     process.on 'exit', ->
       fs.unlinkSync pidfile if fs.existsSync pidfile
       fs.unlinkSync widfile if fs.existsSync widfile
