@@ -11,7 +11,10 @@
     "url": "https://github.com/geta6/nodectl"
   },
   "keywords": [
-    "supervisor"
+    "supervisor",
+    "forever",
+    "daemon",
+    "cluster"
   ],
   "dependencies": {
     "coffee-script": "1.6.3",
