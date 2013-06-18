@@ -41,7 +41,6 @@ noseinfo = require '../package.json'
 packages or=
   name: 'unknown'
   version: 'unknown'
-pidfiles = "../tmp/#{}.pid"
 
 # Argument Parser
 args = [].concat process.argv
@@ -217,6 +216,7 @@ unless fs.existsSync options.pidpath
 
 pidfile = path.join "#{options.pidpath}", "#{packages.name}.pid"
 widfile = path.join "#{options.pidpath}", "#{packages.name}.wid"
+xidfile = path.join "#{options.pidpath}", "#{packages.name}.xid"
 
 if options.logpath
   unless fs.existsSync options.logpath
@@ -274,6 +274,7 @@ if actions.stop
         console.log "#{packages.name} stopped."
         fs.unlinkSync pidfile if fs.existsSync pidfile
         fs.unlinkSync widfile if fs.existsSync widfile
+        fs.unlinkSync xidfile if fs.existsSync xidfile
       catch e
         console.error "kill #{pid} failed: no such process."
     else
@@ -283,11 +284,16 @@ if actions.clear
   console.warn "clear pidfile for #{packages.name}."
   if fs.existsSync pidfile
     pid = parseInt (fs.readFileSync pidfile, 'utf-8'), 10
+    xid = parseInt (fs.readFileSync xidfile, 'utf-8'), 10
     fs.unlinkSync pidfile if fs.existsSync pidfile
     fs.unlinkSync widfile if fs.existsSync widfile
+    fs.unlinkSync xidfile if fs.existsSync xidfile
     try
       process.kill pid, 'SIGINT'
       console.log "#{packages.name} stopped."
+      if fs.existsSync xidfile
+        process.kill xid, 'SIGINT'
+        console.log "#{packages.name} spawn process stopped."
     catch e
       console.error "kill #{pid} failed: no such process."
 
@@ -306,6 +312,9 @@ if actions.start
     process.exit 1
 
   if cluster.isMaster
+
+    process.env.NODECTL = 'master'
+
     if fs.existsSync pidfile
       console.error "#{packages.name} already running."
       process.exit 1
@@ -494,21 +503,30 @@ if actions.start
           'node'
       if options.verbose
         console.log ">>> Execmaster spawned '#{options.execmaster}'"
-      spawn scriptbin, [options.execmaster],
+      child = spawn scriptbin, [options.execmaster],
         stdio: 'inherit'
         env: process.env
         cwd: process.cwd()
         detached: yes
+      fs.writeFileSync xidfile, child.pid
 
     fs.writeFileSync pidfile, process.pid
 
     process.on 'exit', ->
       fs.unlinkSync pidfile if fs.existsSync pidfile
       fs.unlinkSync widfile if fs.existsSync widfile
+      if fs.existsSync xidfile
+        xid = fs.readFileSync xidfile, 'utf-8'
+        try
+          process.kill xid, 'SIGINT'
+        catch e
+          console.error "execmaster already downed (#{e.message})"
+      fs.unlinkSync xidfile if fs.existsSync xidfile
     process.on 'SIGINT', -> process.exit 0
 
     logger process, yes
 
   else
+    process.env.NODECTL = 'child'
     require path.join process.cwd(), actions.main
     logger process, no
