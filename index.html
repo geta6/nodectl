@@ -29,6 +29,26 @@
       </header>
       <section>
         <h1>
+<a name="what-is-this" class="anchor" href="#what-is-this"><span class="octicon octicon-link"></span></a>What is this:</h1>
+
+<p>A simple CLI tool for ensuring that a given application runs conveniently and continuously.</p>
+
+<p><code>nodectl</code> has start-stop-daemon like interface. (Ex. <code>nodectl {start|stop|reload|restart}</code>)</p>
+
+<p>All your operations affect only under current directory.
+<code>nodectl</code> cannot manage your applications globally like <code>nodejitsu/forever</code>.</p>
+
+<h1>
+<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features:</h1>
+
+<ul>
+<li>Easily daemonize</li>
+<li>Easily clustering</li>
+<li>Auto restart server on your app down</li>
+<li>Auto reload your app on scripts changes</li>
+<li>Auto rebuild and minify your assets on changes (jade, stylus, coffee, html, css, js)</li>
+<li>and more</li>
+</ul><h1>
 <a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Install:</h1>
 
 <div class="highlight"><pre>npm install -g nodectl
