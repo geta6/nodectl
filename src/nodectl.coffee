@@ -1,532 +1,694 @@
-# Compiler
+# Dependencies
+
+fs = require 'fs'
+path = require 'path'
+util = require 'util'
+cluster = require 'cluster'
+{exec, spawn} = require 'child_process'
+
+mkdirp = require 'mkdirp'
+moment = require 'moment'
 
 coffee = require 'coffee-script'
 stylus = require 'stylus'
 jade = require 'jade'
-
-# Variable
-
-fs = require 'fs'
-path = require 'path'
-{print} = require 'util'
-{spawn, exec} = require 'child_process'
-cluster = require 'cluster'
-crypto = require 'crypto'
-
-shasum = (source) ->
-  return crypto.createHash('sha1').update(source).digest 'hex'
-
-mkdirp = require 'mkdirp'
 uglify = require 'uglify-js'
 sqwish = require 'sqwish'
 markup = require 'html-minifier'
 
-PROJECT = path.resolve()
+process.env.NODECTL or= 'master'
 
-# Default Value
+# Variables
 
-for dir, i in (path.resolve()).split '/'
-  up = ''; up += '../' for j in Array(i)
-  if fs.existsSync path.resolve up, 'package.json'
-    packages = require path.resolve up, 'package.json'
-    PROJECT = path.resolve up
-    break
+NC = {}
+STDOUT = fs.createWriteStream '/dev/null'
+STDERR = fs.createWriteStream '/dev/null'
+ROOTCTL = path.join (path.dirname process.mainModule.filename), '..'
+NODECTL = require path.join ROOTCTL, 'package.json'
 
-defaults = switch
-  when fs.existsSync path.join PROJECT, '.nodectl.json'
-    require path.join PROJECT, '.nodectl.json'
-  else {}
+# Environments
 
-noseinfo = require '../package.json'
-packages or=
-  name: 'unknown'
-  version: 'unknown'
+( ->
+  try
+    for dir, i in process.cwd().split(path.sep)
+      trace = ''; trace += "..#{path.sep}" for j in Array i
+      if fs.existsSync path.resolve trace, 'package.json'
+        NC.ROOTDIR = path.resolve trace
+    throw new Error 'cannot find package.json' unless NC.ROOTDIR
 
-# Argument Parser
-args = [].concat process.argv
-
-action = 'start'
-actions =
-  main: defaults.main || packages.main || ''
-  stop: no
-  start: no
-  clear: no
-  reload: no
-  status: no
-  help: no
-  version: no
-
-options =
-  port: defaults.port || packages.port || 3000
-  env: defaults.env || packages.env || 'development'
-  cluster: defaults.cluster || packages.cluster || require('os').cpus().length
-  delay: defaults.cluster || packages.cluster || 250
-  logpath: defaults.logpath || packages.logpath || null
-  pidpath: defaults.pidpath || packages.pidpath || path.join (path.dirname process.mainModule.filename), '..', 'tmp'
-  execmaster: defaults.execmaster || packages.execmaster || no
-  nocolor: defaults.nocolor || packages.nocolor || no
-  daemon: defaults.daemon || packages.daemon || no
-  watch: defaults.watch || packages.watch || no
-  assets: defaults.assets || packages.assets || null
-  output: defaults.output || packages.output || null
-  minify: defaults.minify || packages.minify || no
-  verbose: defaults.verbose || packages.verbose || no
-
-try
-  args = [].concat process.argv
-  args.shift()
-  args.shift()
-  while arg = args.shift()
-    switch arg
-      when 'stop'
-        action = 'stop'
-        actions.start = no
-        actions.stop = yes
-      when 'start'
-        action = 'start'
-        actions.start = yes
-        actions.stop = no
-      when 'restart'
-        action = 'restart'
-        actions.start = yes
-        actions.stop = yes
-      when 'force-clear', 'force_clear'
-        action = 'force-clear'
-        actions.start = no
-        actions.stop = no
-        actions.clear = yes
-      when 'reload'
-        action = 'reload'
-        actions.reload = yes
-      when 'status'
-        action = 'status'
-        actions.status = yes
-      when '-p', '-port', '--port'
-        options.port = parseInt args.shift(), 10
-        throw (new Error "#{arg} [INT], port number") if isNaN options.port
-      when '-e', '-env', '--env'
-        options.env = args.shift()
-      when '-c', '-cluster', '--cluster'
-        options.cluster = parseInt args.shift(), 10
-        throw (new Error "#{arg} [INT], number of fork children") if isNaN options.cluster
-      when '-D', '-delay', '--delay'
-        options.delay = parseInt args.shift(), 10
-        throw (new Error "#{arg} [INT], reload delay time (ms)") if isNaN options.delay
-      when '-l', '-logpath', '--logpath'
-        options.logpath = args.shift()
-      when '-P', '-pidpath', '--pidpath'
-        options.pidpath = args.shift()
-      when '-x', '-execmaster', '--execmaster'
-        options.execmaster = args.shift()
-      when '-n', '-nocolor', '--nocolor'
-        options.nocolor = yes
-      when '-d', '-daemon', '--daemon'
-        options.daemon = yes
-      when '-w', '-watch', '--watch'
-        options.watch = yes
-      when '-a', '-assets', '--assets'
-        assets = path.resolve args.shift()
-        options.assets = assets if fs.existsSync assets
-      when '-o', '-output', '--output'
-        output = path.resolve args.shift()
-        options.output = output if fs.existsSync output
-      when '-m', '-minify', '--minify'
-        options.minify = yes
-      when '-V', '-verbose', '--verbose'
-        options.verbose = yes
-      when '-v', '-version', '--version'
-        actions.version = yes
-      when '-h', '-help', '--help', 'help'
-        actions.help = yes
-      else
-        actions.main = arg
-
-catch e
-  console.error e.message
-
-process.env.PORT = options.port
-process.env.NODE_ENV = options.env
-
-if action is 'start'
-  actions.start = yes
-
-unless options.nocolor
-  origin = {}
-
-  for method in ['log', 'info', 'warn', 'error']
-    do (method) ->
-      origin[method] = console[method]
-      console[method] = ->
-        print switch method
-          when 'log' then '\x1b[37m'
-          when 'info' then '\x1b[34m'
-          when 'warn' then '\x1b[33m'
-          when 'error' then '\x1b[31m'
-        origin[method].apply @, arguments
-        print '\x1b[0m'
-
-if actions.help
-  console.log """
-    #{noseinfo.name} version #{noseinfo.version}
-
-    How to use:
-      http://geta6.github.io/nodectl/
-
-    Target:
-      #{packages.name} version #{packages.version}
-
-    Usage:
-      #{noseinfo.name} [action] [options] <program>
-
-    Action:
-      start        execute <program> (default action)
-      stop         stop daemonized <program>
-      restart      restart <program> with daemonize mode
-      force-clear  force clear pid
-      reload       apply edited javascript
-      status       check <program> running or not
-      help         show this message and exit
-
-    Options:
-      -p, --port [3000]        pass listening port with `process.env.PORT`
-      -e, --env [development]  pass environment with `process.env.NODE_ENV`
-      -c, --cluster []         concurrent process with cpu threads default
-      -d, --daemon             daemonize process
-      -w, --watch              watch code changes, auto reload programs
-      -D, --delay [250]        delay time for re-fork child workers
-      -n, --nocolor            stop colorize console
-      -P, --pidpath [(auto)]   directory for pid files
-      -l, --logpath []         directory for log files
-      -x, --execmaster []      execute script on master process
-      -a, --assets []          directory for assets watch and compile (js, coffee, css, styl, html, jade)
-      -o, --output []          directory for output js/css
-      -m, --minify             minify compiled assets
-      -V, --verbose            show verbose information on launch and compiled
-      -v, --version            show version and exit
-      -h, --help               show this message and exit
-    """
-  process.exit 1
-
-if actions.version
-  console.log "#{noseinfo.name} version #{noseinfo.version}"
-  process.exit 1
-
-unless fs.existsSync options.pidpath
-  fs.mkdirSync path.join options.pidpath
-
-pidfile = path.join "#{options.pidpath}", "#{packages.name}.pid"
-widfile = path.join "#{options.pidpath}", "#{packages.name}.wid"
-xidfile = path.join "#{options.pidpath}", "#{packages.name}.xid"
-
-if options.logpath
-  unless fs.existsSync options.logpath
-    fs.mkdirSync path.join options.logpath
-
-stream = no
-if options.logpath
-  stream =
-    master: fs.createWriteStream (path.join "#{options.logpath}", "master.log"), flags: 'a'
-    masterErr: fs.createWriteStream (path.join "#{options.logpath}", "master.error.log"), flags: 'a'
-    worker: fs.createWriteStream (path.join "#{options.logpath}", "worker.log"), flags: 'a'
-    workerErr: fs.createWriteStream (path.join "#{options.logpath}", "worker.error.log"), flags: 'a'
-else
-  options.logpath = null
-
-logger = (control, isMaster = no) ->
-  if stream
-    stdout = control.stdout.write
-    stderr = control.stderr.write
-    if isMaster
-      control.stdout.write = ->
-        stdout.apply @, arguments
-        stream.master.write (arguments[0].replace /\x1b.*?m/g, '')
-      control.stderr.write = ->
-        stderr.apply @, arguments
-        stream.masterErr.write (arguments[0].replace /\x1b.*?m/g, '')
-    else
-      control.stdout.write = ->
-        stdout.apply @, arguments
-        stream.worker.write (arguments[0].replace /\x1b.*?m/g, '')
-      control.stderr.write = ->
-        stderr.apply @, arguments
-        stream.workerErr.write (arguments[0].replace /\x1b.*?m/g, '')
-
-reloadAllChilds = (delay = 0) ->
-  console.info '>>> Reload all childs.'
-  if fs.existsSync widfile
-    for wid, i in (fs.readFileSync widfile, 'utf-8').split ' '
-      do (wid, i) ->
-        setTimeout ->
-          try
-            process.kill wid, 'SIGINT'
-          catch e
-            console.error e.message
-        , delay * i
-  else
-    console.error 'widfile missing.'
-
-if actions.stop
-  if cluster.isMaster
-    if fs.existsSync pidfile
-      pid = parseInt (fs.readFileSync pidfile, 'utf-8'), 10
-      try
-        process.kill pid, 'SIGINT'
-        console.log "#{packages.name} stopped."
-        fs.unlinkSync pidfile if fs.existsSync pidfile
-        fs.unlinkSync widfile if fs.existsSync widfile
-        fs.unlinkSync xidfile if fs.existsSync xidfile
-      catch e
-        console.error "kill #{pid} failed: no such process."
-    else
-      console.error "#{packages.name} not running, pidfile not exists."
-
-if actions.clear
-  console.warn "clear pidfile for #{packages.name}."
-  if fs.existsSync pidfile
-    pid = parseInt (fs.readFileSync pidfile, 'utf-8'), 10
-    xid = parseInt (fs.readFileSync xidfile, 'utf-8'), 10
-    fs.unlinkSync pidfile if fs.existsSync pidfile
-    fs.unlinkSync widfile if fs.existsSync widfile
-    fs.unlinkSync xidfile if fs.existsSync xidfile
-    try
-      process.kill pid, 'SIGINT'
-      console.log "#{packages.name} stopped."
-      if fs.existsSync xidfile
-        process.kill xid, 'SIGINT'
-        console.log "#{packages.name} spawn process stopped."
-    catch e
-      console.error "kill #{pid} failed: no such process."
-
-if actions.reload
-  reloadAllChilds options.delay
-
-if actions.status
-  if fs.existsSync pidfile
-    console.log "#{packages.name} running."
-  else
-    console.log "#{packages.name} not running."
-
-if actions.start
-  unless fs.existsSync actions.main
-    console.error "`#{actions.main}` is not action, or not exists."
+  catch e
+    console.error "\x1b[31mProjectError: #{e.message}\x1b[0m"
     process.exit 1
 
+  NC.PKGINFO =
+    NODECTL: try require path.join NC.ROOTDIR, '.nodectl.json' catch e then {}
+    PROJECT: try require path.join NC.ROOTDIR, 'package.json' catch e then {}
+
+  NC.DEFAULT = (key, val) ->
+    return NC.PKGINFO.NODECTL[key] || NC.PKGINFO.PROJECT[key] || val
+
+  NC.SYMBOLS = 'start'
+
+  NC.ACTIONS =
+      start:   yes
+      stop:    no
+      restart: no
+      status:  no
+      debug:   no
+      version: no
+      help:    no
+
+  NC.OPTIONS =
+      port:    NC.DEFAULT 'port',    3000
+      env:     NC.DEFAULT 'env',     'development'
+      cluster: NC.DEFAULT 'cluster', (require 'os').cpus().length
+      delay:   NC.DEFAULT 'delay',   250
+      exec:    NC.DEFAULT 'exec',    ''
+      setenv:  NC.DEFAULT 'setenv',  {}
+      log:     NC.DEFAULT 'log',     ''
+      stdout:  NC.DEFAULT 'stdout',  ''
+      stderr:  NC.DEFAULT 'stderr',  ''
+      assets:  NC.DEFAULT 'assets',  ''
+      output:  NC.DEFAULT 'output',  ''
+      minify:  NC.DEFAULT 'minify',  no
+      daemon:  NC.DEFAULT 'daemon',  no
+      watch:   NC.DEFAULT 'watch',   no
+      nocolor: NC.DEFAULT 'nocolor', no
+
+  NC.PROJECT =
+    name:    NC.DEFAULT 'name',    no
+    main:    NC.DEFAULT 'main',    no
+    version: NC.DEFAULT 'version', no
+    running: path.join NC.ROOTDIR, '.nodectl.run'
+
+  NC.PROCESS =
+    id: "#{NC.PROJECT.name}/#{NC.PROJECT.version}"
+    pid: null
+    wid: []
+    xid: null
+
+  NC.DELETES = ->
+    NC.IMPORTS()
+    try
+      process.kill NC.PROCESS.pid, 'SIGINT'
+      console.warn "#{NC.PROCESS.id} stopped."
+    catch e
+      console.error "ProcessError: #{e.message}"
+    try
+      process.kill NC.PROCESS.xid, 'SIGINT'
+      console.warn "#{NC.PROCESS.id} exec process stopped."
+    catch e
+      console.warn "#{NC.PROCESS.id} exec process already stopped."
+    finally
+      fs.unlinkSync NC.PROJECT.running if fs.existsSync NC.PROJECT.running
+
+  NC.EXPORTS = ->
+    try
+      if NC.ACTIONS.debug
+        fs.writeFileSync NC.PROJECT.running, JSON.stringify NC, null, '  '
+      else
+        fs.writeFileSync NC.PROJECT.running, JSON.stringify NC
+    catch e
+      console.error e
+    finally
+      return NC
+
+  NC.IMPORTS = ->
+    try
+      if fs.existsSync NC.PROJECT.running
+        json = JSON.parse fs.readFileSync NC.PROJECT.running, 'utf-8'
+        NC[k] = v for k, v of json
+    catch e
+      console.error e
+    finally
+      return NC
+
+  NC.IMPORTS() if fs.existsSync NC.PROJECT.running
+)()
+
+# Argument Parser
+
+( ->
+  ARGS = [].concat process.argv
+  ARGS.splice 0, 2
+
+  try
+    while arg = ARGS.shift()
+      unless '-' is arg.substr 0, 1
+        switch arg
+          when 'start'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.start   = yes
+            NC.ACTIONS.stop    = no
+            NC.ACTIONS.restart = no
+            NC.ACTIONS.status  = no
+
+          when 'stop'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.start   = no
+            NC.ACTIONS.stop    = yes
+            NC.ACTIONS.restart = no
+            NC.ACTIONS.status  = no
+
+          when 'restart'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.start   = no
+            NC.ACTIONS.stop    = no
+            NC.ACTIONS.restart = yes
+            NC.ACTIONS.status  = no
+
+          when 'status'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.start   = no
+            NC.ACTIONS.stop    = no
+            NC.ACTIONS.restart = no
+            NC.ACTIONS.status  = yes
+
+          when 'version'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.version = yes
+
+          when 'help'
+            NC.SYMBOLS = arg
+            NC.ACTIONS.help    = yes
+
+          else
+            NC.PROJECT.main = arg
+            unless fs.existsSync NC.PROJECT.main
+              throw new Error "unrecognized action: #{arg}"
+
+      else
+        switch arg
+          when '-p', '-port', '--port'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.port = parseInt next, 10
+
+          when '-e', '-env', '--env'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.env = String next
+
+          when '-c', '-cluster', '--cluster'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.cluster = parseInt next, 10
+
+          when '-d', '-delay', '--delay'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.delay = parseInt next, 10
+
+          when '-s', '-setenv', '--setenv'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            envs = (String next).split '='
+            envs[1] = (parseFloat envs[1], 10) if /^[1-9][0-9\.]*$/.test envs[1]
+            NC.OPTIONS.setenv[envs[0]] = envs[1]
+
+          when '-x', '-exec', '--exec'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.exec = path.join NC.ROOTDIR, next
+
+          when '-l', '-log', '--log'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.log = path.join NC.ROOTDIR, next
+
+          when '-1', '-stdout', '--stdout'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.stdout = path.join NC.ROOTDIR, next
+
+          when '-2', '-stderr', '--stderr'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.stderr = path.join NC.ROOTDIR, next
+
+          when '-a', '-assets', '--assets'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.assets = path.join NC.ROOTDIR, next
+
+          when '-o', '-output', '--output'
+            if typeof (next = ARGS.shift()) is 'undefined' or '-' is next.substr 0, 1
+              throw new Error "option '#{arg}' requires parameter"
+            NC.OPTIONS.output = path.join NC.ROOTDIR, next
+
+          when '-M', '-minify', '--minify'
+            NC.OPTIONS.minify = yes
+
+          when '-D', '-daemon', '--daemon'
+            NC.OPTIONS.daemon = yes
+
+          when '-W', '-watch', '--watch'
+            NC.OPTIONS.watch = yes
+
+          when '-N', '-nocolor', '--nocolor'
+            NC.OPTIONS.nocolor = yes
+
+          when '-v', '-version', '--version'
+            NC.ACTIONS.version = yes
+
+          when '-h', '-help', '--help'
+            NC.ACTIONS.help = yes
+
+          when '-debug', '--debug'
+            NC.ACTIONS.debug = yes
+
+          else
+            throw new Error "unrecognized option: #{arg}"
+
+    # Fix
+    if NC.OPTIONS.exec   and '/' isnt NC.OPTIONS.exec.substr 0, 1
+      NC.OPTIONS.exec   = path.join NC.ROOTDIR, NC.OPTIONS.exec
+
+    for key in ['log', 'stdout', 'stderr', 'assets', 'output']
+      if NC.OPTIONS[key] and '/' isnt NC.OPTIONS[key].substr 0, 1
+        NC.OPTIONS[key] = path.join NC.ROOTDIR, NC.OPTIONS[key]
+      if '/' is NC.OPTIONS[key].substr -1
+        NC.OPTIONS[key] = NC.OPTIONS[key].substr 0, NC.OPTIONS[key].length - 1
+
+    # Check
+    if !(NC.OPTIONS.setenv instanceof Object) and NC.OPTIONS.setenv.toString() isnt '[object Object]'
+      envs = NC.OPTIONS.setenv.split '='
+      NC.OPTIONS.setenv = {}
+      NC.OPTIONS.setenv[envs[0]] = envs[1]
+
+    if isNaN NC.OPTIONS.port
+      throw new Error "option '-p, port' parameter should number"
+
+    if 1 > NC.OPTIONS.env.length
+      throw new Error "option '-e, env' parameter should string"
+
+    if isNaN NC.OPTIONS.cluster
+      throw new Error "option '-c, cluster' parameter should number"
+
+    if isNaN NC.OPTIONS.delay
+      throw new Error "option '-d, delay' parameter should number"
+
+    if NC.OPTIONS.exec
+      if !fs.existsSync NC.OPTIONS.exec or !(fs.statSync NC.OPTIONS.exec).isFile()
+        throw new Error "option '-x, exec' parameter should file"
+
+    if NC.OPTIONS.log
+      unless fs.existsSync path.dirname NC.OPTIONS.log
+        mkdirp.sync path.dirname NC.OPTIONS.log
+      unless fs.existsSync NC.OPTIONS.log
+        fs.writeFileSync NC.OPTIONS.log, ''
+      unless (fs.statSync NC.OPTIONS.log).isFile()
+        throw new Error "option '-l, log' parameter should file"
+      NC.OPTIONS.stdout = NC.OPTIONS.stderr = NC.OPTIONS.log
+
+    if NC.OPTIONS.stdout
+      unless fs.existsSync path.dirname NC.OPTIONS.stdout
+        fs.mkdirSync path.dirname NC.OPTIONS.stdout
+      unless fs.existsSync NC.OPTIONS.stdout
+        fs.writeFileSync NC.OPTIONS.stdout, ''
+      unless (fs.statSync NC.OPTIONS.stdout).isFile()
+        throw new Error "option '-1, stdout' parameter should file"
+      STDOUT = fs.createWriteStream NC.OPTIONS.stdout, flags: 'a'
+
+    if NC.OPTIONS.stderr
+      unless fs.existsSync path.dirname NC.OPTIONS.stderr
+        fs.mkdirSync path.dirname NC.OPTIONS.stderr
+      unless fs.existsSync NC.OPTIONS.stderr
+        fs.writeFileSync NC.OPTIONS.stderr, ''
+      unless (fs.statSync NC.OPTIONS.stderr).isFile()
+        throw new Error "option '-2, stderr' parameter should file"
+      STDERR = fs.createWriteStream NC.OPTIONS.stderr, flags: 'a'
+
+    if NC.OPTIONS.assets
+      if !fs.existsSync NC.OPTIONS.assets or !(fs.statSync NC.OPTIONS.assets).isDirectory()
+        throw new Error "option '-a, assets' parameter should directory"
+      if !NC.OPTIONS.output
+        throw new Error "--assets requires --output"
+
+    if NC.OPTIONS.output
+      if !fs.existsSync NC.OPTIONS.output or !(fs.statSync NC.OPTIONS.output).isDirectory()
+        throw new Error "option '-o, output' parameter should directory"
+      if !NC.OPTIONS.assets
+        throw new Error "--output requires --assets"
+
+  catch e
+    console.error "\x1b[31mArgumentError: #{e.message}\x1b[0m"
+    process.exit 1
+
+  finally
+    process.env.PORT = NC.OPTIONS.port
+    process.env.NODE_ENV = NC.OPTIONS.env
+)()
+
+# Detect Helper
+
+( ->
+  if NC.ACTIONS.version or NC.ACTIONS.help
+    console.log "nodectl version: #{NODECTL.name}/#{NODECTL.version}"
+    if NC.ACTIONS.help
+      console.log """
+        Usage: #{NODECTL.name} [action] [options] <script>
+
+        Action:
+          start   : start <script> as a node.js app
+          stop    : stop the <script>
+          restart : restart the <script>
+          status  : check the <program> running or not
+
+        Options:
+          -p, --port    : set process.env.PORT        #{process.env.PORT}
+          -e, --env     : set process.env.NODE_ENV    #{process.env.NODE_ENV}
+          -c, --cluster : number of concurrents       #{NC.OPTIONS.cluster}
+          -d, --delay   : delay time for refork       #{NC.OPTIONS.delay}
+          -s, --setenv  : set custom env (k=v)        #{(util.inspect NC.OPTIONS.setenv).replace(/\n/g, '').replace(/\s\s*/g, ' ')}
+          -x, --exec    : exec job script             #{NC.OPTIONS.exec}
+          -l, --log     : stdout+stderr log file      #{NC.OPTIONS.log}
+          -1, --stdout  : stdout log file             #{NC.OPTIONS.stdout}
+          -2, --stderr  : stderr log file             #{NC.OPTIONS.stderr}
+          -a, --assets  : dir for assets              #{NC.OPTIONS.assets}
+          -o, --output  : dir for assets output       #{NC.OPTIONS.output}
+          -M, --minify  : minify compiled assets      #{NC.OPTIONS.minify}
+          -D, --daemon  : daemonize process           #{NC.OPTIONS.daemon}
+          -W, --watch   : restart app on code change  #{NC.OPTIONS.watch}
+          -N, --nocolor : disable custom console      #{NC.OPTIONS.nocolor}
+          -v, --version : show version and exit
+          -h, --help    : show this message and exit
+          --debug       : show debug information
+
+        """
+    process.exit 0
+)()
+
+# Check Project Info
+
+( ->
+  try
+    unless NC.PROJECT.name
+      throw new Error "application `name` unknown"
+    unless NC.PROJECT.version
+      throw new Error "application `version` unknown"
+    unless NC.PROJECT.main
+      throw new Error "application `main` script unknown"
+
+  catch e
+    console.error "\x1b[31mProjectError: #{e.message}\x1b[0m"
+    console.error "\x1b[31mInformation must be described by package.json or .nodectl.json\x1b[0m"
+    process.exit 1
+)()
+
+# Custom Console
+
+( ->
+  console.debug = ->
+    if NC.ACTIONS.debug
+      msg = '\x1b[37m'
+      msg+= head = moment().format('HH:mm:ss') + ' debug'
+      msg+= ' ' for i in Array(20 - head.length)
+      msg+= '| '
+      for arg, i in arguments
+        msg+= if typeof arg is 'string' then arg else util.inspect arg
+        msg+= ' ' if arguments.length > i + 1
+      util.print "#{msg}\x1b[0m\n"
+
+  if !NC.OPTIONS.nocolor
+    colorized = {}
+    for f in ['log', 'info', 'warn', 'error']
+      do (f) ->
+        colorized[f] = console[f]
+        console[f] = ->
+          msg = ''
+          if process.env.NODECTL is 'master'
+            msg+= '\x1b[32m'
+          else if /worker/.test process.env.NODECTL
+            msg+= '\x1b[33m'
+          else if process.env.NODECTL is 'exec'
+            msg+= '\x1b[34m'
+          else
+            msg+= '\x1b[35m'
+          msg+= head = moment().format('HH:mm:ss') + ' ' + process.env.NODECTL
+          msg+= ' ' for i in Array(20 - head.length)
+          msg+= '| '
+          msg+= switch f
+            when 'log'   then '\x1b[0m'
+            when 'info'  then '\x1b[34m'
+            when 'warn'  then '\x1b[33m'
+            when 'error' then '\x1b[31m'
+          util.print msg
+          colorized[f].apply @, arguments
+          util.print '\x1b[0m'
+)()
+
+# Logger
+
+( ->
+  _stdout = process.stdout.write
+  _stderr = process.stdout.write
+  process.stdout.write = ->
+    _stdout.apply @, arguments
+    STDOUT.write arguments[0].replace /\x1b.*?m/g, ''
+  process.stderr.write = ->
+    _stderr.apply @, arguments
+    STDERR.write arguments[0].replace /\x1b.*?m/g, ''
+)()
+
+# Events Emitter
+
+( ->
+
+  process.stdout.pipe STDOUT
+  process.stderr.pipe STDERR
+
   if cluster.isMaster
 
-    process.env.NODECTL = 'master'
-
-    if fs.existsSync pidfile
-      console.error "#{packages.name} already running."
+    process.on 'SIGINT', ->
+      util.print '\n'
+      console.debug 'Master trap SIGINT'
+      NC.DELETES()
       process.exit 1
 
-    console.log "#{packages.name} version #{packages.version}"
-    if options.verbose
-      console.log ""
-      if fs.existsSync path.join PROJECT, '.nodectl.json'
-        console.log ">>> .nodectl.json exists"
-      else
-        console.log ">>> .nodectl.json NOT exists"
-      console.log ""
-      console.log ">>> Param:"
-      console.log ">>>   listening port  ... #{options.port}"
-      console.log ">>>   environment     ... #{options.env}"
-      console.log ">>>   concurrent      ... #{options.cluster}"
-      console.log ">>>   daemonize       ... #{options.daemon}"
-      console.log ">>>   watchmode       ... #{options.watch}"
-      console.log ">>>   colorlize       ... #{!options.nocolor}"
-      console.log ">>>   releaseDelay    ... #{options.delay}"
-      console.log ">>>   execmaster      ... #{options.execmaster}"
-      console.log ">>>   assets          ... #{options.assets}"
-      console.log ">>>   output          ... #{options.output}"
-      console.log ">>>   minify          ... #{options.minify}"
-      console.log ">>>   logpath         ... #{options.logpath}"
-      console.log ">>>   pidpath         ... #{options.pidpath}"
-      console.log ">>>   pidfile         ... #{pidfile}"
-      console.log ""
-
-    workers = []
-
-    cluster.on 'fork', (worker) ->
-      console.log "> Process forked ##{worker.process.pid}"
-
-    cluster.on 'listening', (worker) ->
-      console.info ">> State listening ##{worker.process.pid}"
-
-    cluster.on 'exit', (worker) ->
-      console.error "<< State exit ##{worker.process.pid}"
-      console.info "> Refork process"
-      for wid, i in workers
-        if wid is worker.process.pid
-          workers.splice i, 1
-          workers.push cluster.fork().process.pid
-      fs.writeFileSync widfile, workers.join ' '
-
-    for i in [0...options.cluster]
-      workers.push cluster.fork().process.pid
-    fs.writeFileSync widfile, workers.join ' '
-
-    isFile = (file) -> return fs.statSync(file).isFile()
-    isDir  = (dir) -> return fs.statSync(dir).isDirectory()
-    isCode = (file) -> /\.(coffee|js|json)$/.test path.extname file
-
-    if options.execmaster
-      options.execmaster = path.join process.cwd(), options.execmaster
-      if !fs.existsSync options.execmaster
-        console.error "-x --execmaster '#{options.execmaster}' not exists"
-        process.exit 1
-      if !isFile options.execmaster
-        console.error "-x --execmaster '#{options.execmaster}' not file"
-        process.exit 1
-      if !(isCode options.execmaster)
-        console.error "-x --execmaster '#{options.execmaster}' not script"
-        process.exit 1
-
-    if options.daemon
-      unless process.env.__daemon
-        if options.verbose
-          console.log ">>> Daemonize process"
-        args = [].concat process.argv
-        args.shift()
-        args.shift()
-        process.env.__daemon = yes
-        child = spawn process.mainModule.filename, args,
-          stdio: 'ignore'
-          env: process.env
-          cwd: process.cwd()
-          detached: yes
-        child.unref()
-        process.exit()
-
-    findsByExtPattern = (dir, pattern) ->
-      files = []
-      for src in fs.readdirSync dir
-        dst = path.join dir, src
-        if (dst isnt 'node_modules') and (isDir dst)
-          files = files.concat findsByExtPattern dst, pattern
-        else unless /^\./.test src
-          files.push path.resolve dst if pattern.test dst
-      return files
-
-    escapeRegExp = (string) ->
-      string.replace(/([.*+?^${}()|[\]\/\\])/g, '\\$1')
-
-    if options.watch
-      for watch in findsByExtPattern '.', /\.(js|coffee|json)$/
-        do (watch) ->
-          if isFile watch
-            matchAssets = no
-            matchOutput = no
-            if options.assets
-              regexAssets = new RegExp "^#{escapeRegExp path.resolve options.assets}.*"
-              matchAssets = regexAssets.test watch
-            if options.output
-              regexOutput = new RegExp "^#{escapeRegExp path.resolve options.output}.*"
-              matchOutput = regexOutput.test watch
-            if !matchAssets and !matchOutput
-              try
-                if options.verbose
-                  console.log ">>> [Script] Now wathing '#{watch}'"
-                fs.watch watch, ->
-                  if options.verbose
-                    console.log ">>> [Script] Updated '#{watch}'"
-                  console.info ">> Script updated."
-                  reloadAllChilds options.delay
-              catch e
-                console.error "Watch script #{watch} failed"
-
-    if options.assets and options.output
-      for watch in findsByExtPattern options.assets, /\.(js|coffee|css|styl|html|jade)$/
-        do (watch) ->
-          if isFile watch
+    process.on 'nodectl:restart', ->
+      console.debug "Restart all workers (delay: #{NC.OPTIONS.delay} ms)"
+      console.info "#{NC.PROCESS.id} restart."
+      for wid, i in NC.PROCESS.wid
+        do (wid, i) ->
+          console.debug "Send SIGINT to ##{wid}"
+          setTimeout ->
             try
-              if options.verbose
-                console.log ">>> [Assets] Now wathing '#{watch}'"
-              fs.watch watch, ->
-                try
-                  startTime = new Date()
-                  code = ''
-                  dest = path.resolve path.join options.output, watch.replace (path.resolve options.assets), ''
-                  unless fs.exists path.dirname dest
-                    mkdirp.sync path.dirname dest
-                  if /\.(js|coffee)$/.test watch
-                    dest = path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.js'
-                    code = switch path.extname watch
-                      when '.coffee'
-                        coffee.compile fs.readFileSync watch, 'utf-8'
-                      else
-                        fs.readFileSync watch, 'utf-8'
-                    if options.minify
-                      temp = path.join '/tmp', shasum (Date.now()).toString()
-                      fs.writeFileSync temp, code
-                      {code} = uglify.minify temp
-                      fs.unlinkSync temp
-                  if /\.(css|styl)$/.test watch
-                    dest = path.resolve path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.css'
-                    code = switch path.extname watch
-                      when '.styl'
-                        (stylus fs.readFileSync watch, 'utf-8')
-                          .set('paths', [(path.resolve 'node_modules'), (options.assets)])
-                          .render()
-                      else
-                        fs.readFileSync watch, 'utf-8'
-                    if options.minify
-                      code = sqwish.minify code
-                  if /\.(html|jade)$/.test watch
-                    dest = path.resolve path.join (path.dirname dest), (path.basename dest, path.extname dest) + '.html'
-                    code = switch path.extname watch
-                      when '.jade'
-                        (jade.compile((fs.readFileSync watch, 'utf-8')))()
-                      else
-                        fs.readFileSync watch, 'utf-8'
-                    if options.minify
-                      code = markup.minify code
-                  if code
-                    fs.writeFileSync dest, code, 'utf-8'
-                    if options.verbose
-                      console.log ">>> #{watch} -> #{dest}"
-                      if options.minify
-                        console.log ">>> code minified."
-                    console.info ">> #{path.basename dest} compiled. (#{new Date() - startTime}ms)"
-                catch e
-                  console.error ">> Failure to compile."
-                  console.error e.message
+              process.kill wid, 'SIGINT'
             catch e
-              console.error ">> Watch asset #{watch} failed"
+              console.error "ProcessError: #{e.message}"
+          , NC.OPTIONS.delay * i
 
-    console.log ""
+    process.on 'nodectl:rebuild', (src, dst) ->
+      try
+        console.debug "Build assets < #{src}"
+        console.debug "Build assets > #{dst}"
+        startTime = new Date
+        unless fs.exists path.dirname dst
+          mkdirp.sync path.dirname dst
+        code = fs.readFileSync src, 'utf-8'
+        code = switch path.extname src
+          when '.coffee'
+            coffee.compile code
+          when '.styl'
+            stylus(code).set('paths', [(path.join NC.ROOTDIR, 'node_modules'), (path.dirname src)]).render()
+          when '.jade'
+            jade.compile(code)()
+          else code
+        if NC.OPTIONS.minify
+          len = code.length
+          switch path.extname dst
+            when '.js'
+              tmp = path.join '/tmp', new Date().toString()
+              fs.writeFileSync tmp, code
+              {code} = uglify.minify tmp
+              fs.unlinkSync tmp
+            when '.css'
+              code = sqwish.minify code
+            when '.html'
+              code = markup.minify code
+          console.debug "Minified #{parseInt(code.length / len * 1000) / 10} %"
+        console.debug "Elapsed time #{new Date - startTime} ms"
+        fs.writeFileSync dst, code, 'utf-8'
+        console.log "Build assets (#{path.basename src} > #{path.basename dst})"
+        return yes
 
-    if options.execmaster
-      scriptbin = switch path.extname options.execmaster
-        when '.coffee'
-          './node_modules/coffee-script/bin/coffee'
-        else
-          'node'
-      if options.verbose
-        console.log ">>> Execmaster spawned '#{options.execmaster}'"
-      child = spawn scriptbin, [options.execmaster],
-        stdio: 'inherit'
-        env: process.env
-        cwd: process.cwd()
-        detached: yes
-      fs.writeFileSync xidfile, child.pid
+      catch e
+        console.error "Build assets failure. (#{src})"
+        console.error e.message
+        return no
 
-    fs.writeFileSync pidfile, process.pid
+)()
 
-    process.on 'exit', ->
-      fs.unlinkSync pidfile if fs.existsSync pidfile
-      fs.unlinkSync widfile if fs.existsSync widfile
-      if fs.existsSync xidfile
-        xid = fs.readFileSync xidfile, 'utf-8'
+# Process Status
+
+( ->
+  if NC.ACTIONS.status
+    if fs.existsSync NC.PROJECT.running
+      util.print "#{NC.PROJECT.name} running.\n"
+    else
+      util.print "#{NC.PROJECT.name} not running.\n"
+    process.exit 0
+)()
+
+# Process Stop
+
+( ->
+  if NC.ACTIONS.stop
+    if fs.existsSync NC.PROJECT.running
+      process.kill NC.PROCESS.pid, 'SIGINT'
+    else
+      console.warn "#{NC.PROCESS.id} already stopped."
+    process.exit 0
+)()
+
+# Process Restart
+
+( ->
+  if NC.ACTIONS.restart
+    process.emit 'nodectl:restart'
+)()
+
+# Process Start
+
+( ->
+  if NC.ACTIONS.start
+    if cluster.isMaster
+      if fs.existsSync NC.PROJECT.running
+        console.warn "#{NC.PROCESS.id} already runninng"
+        process.exit 1
+      console.debug 'act', k, ':', v for k, v of NC.ACTIONS
+      console.debug 'opt', k, ':', v for k, v of NC.OPTIONS
+      console.info "#{NC.PROCESS.id} starting."
+
+      NC.PROCESS.pid = process.pid
+
+      cluster.on 'online', (worker) ->
+        console.log "Worker online ##{worker.process.pid}"
+
+      cluster.on 'listening', (worker) ->
+        console.info "Worker listening ##{worker.process.pid}"
+
+      cluster.on 'exit', (worker) ->
+        console.warn "Worker exit ##{worker.process.pid} (#{if worker.suicide then 'suicide' else 'no suicide'})"
+        for wid, i in NC.PROCESS.wid
+          if wid is worker.process.pid
+            NC.PROCESS.wid.splice i, 1
+            _worker = cluster.fork({NODECTL: worker.type})
+            _worker.type = worker.type
+            NC.PROCESS.wid.push _worker.process.pid
+        NC.EXPORTS()
+
+      if NC.OPTIONS.daemon
+        unless process.env.__daemon
+          console.log "Master daemonize"
+          args = [].concat process.argv
+          args.shift()
+          args.shift()
+          process.env.__daemon = yes
+          child = spawn process.mainModule.filename, args,
+            stdio: 'ignore'
+            env: process.env
+            cwd: process.cwd()
+            detached: yes
+          child.unref()
+          process.exit 0
+        NC.PROCESS.pid = process.pid
+
+      NC.EXPORTS()
+
+      if NC.OPTIONS.exec
+        bin = switch path.extname NC.OPTIONS.exec
+          when '.coffee' then path.join ROOTCTL, 'node_modules', 'coffee-script', 'bin', 'coffee'
+          else                'node'
         try
-          process.kill xid, 'SIGINT'
+          child = spawn bin, [NC.OPTIONS.exec],
+            # stdio: 'inherit'
+            env: process.env
+            cwd: process.cwd()
+            detached: yes
+          child.stdout.on 'data', (data) ->
+            msg = '\x1b[34m'
+            msg+= head = moment().format('HH:mm:ss') + ' exec'
+            msg+= ' ' for i in Array(20 - head.length)
+            msg+= '| '
+            util.print "\x1b[32m#{msg}\x1b[0m#{data}"
+          child.stderr.on 'data', (data) ->
+            msg = '\x1b[34m'
+            msg+= head = moment().format('HH:mm:ss') + ' exec'
+            msg+= ' ' for i in Array(20 - head.length)
+            msg+= '| '
+            util.print "#{msg}\x1b[0m#{data}"
+          console.log "Master spawn ##{child.pid}"
+          NC.PROCESS.xid = child.pid
         catch e
-          console.error "execmaster already downed (#{e.message})"
-      fs.unlinkSync xidfile if fs.existsSync xidfile
-    process.on 'SIGINT', -> process.exit 0
+          console.error e
+        finally
+          NC.EXPORTS()
 
-    logger process, yes
+      seekdir = (dir) ->
+        res = []; return res if (fs.statSync dir).isFile()
+        for rel in fs.readdirSync dir
+          abs = path.join dir, rel
+          if rel isnt 'node_modules' and (rel.substr 0, 1) isnt '.'
+            if (fs.statSync abs).isDirectory()
+              res.push abs
+              res = res.concat arguments.callee abs
+        return res
 
-  else
-    process.env.NODECTL = 'child'
-    require path.join process.cwd(), actions.main
-    logger process, no
+      if NC.OPTIONS.watch
+        for dir in [NC.ROOTDIR].concat seekdir NC.ROOTDIR
+          timeout = null
+          do (dir) ->
+            return null if (new RegExp NC.OPTIONS.assets).test dir
+            return null if (new RegExp NC.OPTIONS.output).test dir
+            console.log 'Master watch', '<', dir
+            fs.watch dir, (act, rel) =>
+              console.debug "fs watch triggerd (#{act}, #{rel})"
+              if /\.(js|coffee|json)$/.test rel
+                clearTimeout timeout
+                timeout = setTimeout ->
+                  abs = path.join dir, rel
+                  if act is 'change' or fs.existsSync abs
+                    console.log "Code changed (#{rel})"
+                    process.emit 'nodectl:restart', act, abs, null
+                , NC.OPTIONS.delay
+
+      if NC.OPTIONS.assets and NC.OPTIONS.output
+        for dir in [NC.OPTIONS.assets].concat seekdir NC.OPTIONS.assets
+          timeout = null
+          do (dir) ->
+            out = dir.replace NC.OPTIONS.assets, NC.OPTIONS.output
+            console.log 'Master watch assets', '<', dir
+            fs.watch dir, (act, rel) =>
+              console.debug "fs watch triggerd (#{act}, #{rel})"
+              if /\.(js|coffee|css|styl|html|jade)$/.test rel
+                clearTimeout timeout
+                timeout = setTimeout ->
+                  abs = path.join dir, rel
+                  dst = switch path.extname rel
+                    when '.coffee' then path.join out, rel.replace /\.coffee$/, '.js'
+                    when '.styl'   then path.join out, rel.replace /\.styl$/,   '.css'
+                    when '.jade'   then path.join out, rel.replace /\.jade$/,   '.html'
+                    else                path.join out, rel
+                  if fs.existsSync abs
+                    process.emit 'nodectl:rebuild', abs, dst
+                  else
+                    fs.unlinkSync dst
+                , NC.OPTIONS.delay
+
+      ( ->
+        for i in [0...NC.OPTIONS.cluster]
+          worker = cluster.fork({NODECTL: "worker.#{i+1}"})
+          worker.type = "worker.#{i+1}"
+          NC.PROCESS.wid.push worker.process.pid
+        NC.EXPORTS()
+      )()
+
+    else
+      process.on 'SIGINT', ->
+        console.debug 'Worker trap SIGINT'
+        process.suicide = yes
+        process.exit 0
+      require path.join NC.ROOTDIR, NC.PROJECT.main
+)()
