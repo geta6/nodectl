@@ -16,7 +16,7 @@
     <div class="wrapper">
       <header>
         <h1>nodectl</h1>
-        <p>supervisor script for node.js</p>
+        <p>A simple CLI tool for ensuring that a given node.js application runs conveniently and continuously.</p>
 
         <p class="view"><a href="https://github.com/geta6/nodectl">View the Project on GitHub <small>geta6/nodectl</small></a></p>
 
@@ -29,376 +29,399 @@
       </header>
       <section>
         <h1>
-<a name="what-is-this" class="anchor" href="#what-is-this"><span class="octicon octicon-link"></span></a>What is this:</h1>
+<a name="nodectl" class="anchor" href="#nodectl"><span class="octicon octicon-link"></span></a>nodectl</h1>
 
-<p>A simple CLI tool for ensuring that a given application runs conveniently and continuously.</p>
+<p>A simple CLI tool for ensuring that a given node.js application runs conveniently and continuously.</p>
 
-<p><code>nodectl</code> has start-stop-daemon like interface. (Ex. <code>nodectl {start|stop|reload|restart}</code>)</p>
-
-<p>All your operations affect only under current directory.
-<code>nodectl</code> cannot manage your applications globally like <code>nodejitsu/forever</code>.</p>
-
-<h1>
-<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features:</h1>
+<h2>
+<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features</h2>
 
 <ul>
-<li>Easily daemonize</li>
-<li>Easily clustering</li>
-<li>Auto restart server on your app down</li>
-<li>Auto reload your app on scripts changes</li>
-<li>Auto rebuild and minify your assets on changes (jade, stylus, coffee, html, css, js)</li>
-<li>and more</li>
-</ul><h1>
-<a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Install:</h1>
+<li>start-stop interface</li>
+<li>set envs</li>
+<li>clustering</li>
+<li>daemonize</li>
+<li>job script</li>
+<li>stdout and stderr logger</li>
+<li>watch script changes</li>
+<li>watch assets changes</li>
+<li>compile and minify assets</li>
+</ul><h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
 
-<div class="highlight"><pre>npm install -g nodectl
-</pre></div>
-
-<h1>
-<a name="how-to-use" class="anchor" href="#how-to-use"><span class="octicon octicon-link"></span></a>How to use:</h1>
-
-<pre><code>nodectl [action] [options] &lt;program&gt;
+<pre><code>npm i nodectl -g
 </code></pre>
 
-<h1>
-<a name="packagejson--nodectljson" class="anchor" href="#packagejson--nodectljson"><span class="octicon octicon-link"></span></a>package.json / .nodectl.json</h1>
+<h2>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
 
-<ul>
-<li>the key name <code>name</code> is required in <code>package.json</code>.</li>
-<li>
-<code>&lt;program&gt;</code> is omissible if the key name <code>main</code> exists in <code>.nodectl.json</code> or <code>package.json</code>.</li>
-<li>
-<code>[options]</code> defaults load from <code>.nodectl.json</code> and <code>package.json</code>.</li>
-<li>
-<code>[options]</code> defaults are specified by the key name of a long-option-name. </li>
-</ul><h1>
-<a name="synopsis---action" class="anchor" href="#synopsis---action"><span class="octicon octicon-link"></span></a>Synopsis - Action:</h1>
+<p>You can use nodectl to run javascript or coffee-script.</p>
+
+<pre><code>nodectl [action] [options] &lt;script&gt;
+</code></pre>
+
+<p>The option of a lower case requires a parameter, an upper case is Boolean.</p>
+
+<pre><code>Usage: nodectl [action] [options] &lt;script&gt;
+
+Action:
+    start   : start &lt;script&gt; as a node.js app
+    stop    : stop the &lt;script&gt;
+    restart : restart the &lt;script&gt;
+    status  : check the &lt;script&gt; running or not
+
+Options:
+    -p, --port    : set process.env.PORT        3000
+    -e, --env     : set process.env.NODE_ENV    development
+    -c, --cluster : number of concurrents       CPU_THREAD_LENGTH
+    -d, --delay   : delay time for refork       250
+    -s, --setenv  : set custom env (k=v)        {}
+    -x, --exec    : exec job script             null
+    -l, --log     : stdout+stderr log file      null
+    -1, --stdout  : stdout log file             null
+    -2, --stderr  : stderr log file             null
+    -a, --assets  : dir for assets              null
+    -o, --output  : dir for assets output       null
+    -M, --minify  : minify compiled assets      false
+    -D, --daemon  : daemonize process           false
+    -W, --watch   : restart app on code change  false
+    -N, --nocolor : disable custom console      false
+    -v, --version : show version and exit
+    -h, --help    : show this message and exit
+    --debug       : show debug information
+</code></pre>
 
 <h2>
-<a name="show-help" class="anchor" href="#show-help"><span class="octicon octicon-link"></span></a>show help</h2>
+<a name="requirement" class="anchor" href="#requirement"><span class="octicon octicon-link"></span></a>Requirement</h2>
 
-<div class="highlight"><pre>nodectl <span class="nb">help</span>
-nodectl -h
-nodectl -help
+<p>nodectl requires <code>package.json</code> includes the key named <strong>name</strong> and <strong>version</strong>.</p>
+
+<p><code>&lt;script&gt;</code> is omissible if the key named <strong>main</strong> exists in either <code>package.json</code> or <code>.nodectl.json</code>.</p>
+
+<h3>
+<a name="nodectljson" class="anchor" href="#nodectljson"><span class="octicon octicon-link"></span></a>.nodectl.json</h3>
+
+<p>When <code>.nodectl.json</code> is placed in <code>PROJECT_ROOT</code>, load the value for key named <strong>long-option-name</strong> and set to a <code>[options]</code> default value.</p>
+
+<p>See <a href="#Recipes">Recipes</a> section for how to write json file.</p>
+
+<h3>
+<a name="nodectlrun" class="anchor" href="#nodectlrun"><span class="octicon octicon-link"></span></a>.nodectl.run</h3>
+
+<p>Do not touch <code>${PROJECT_ROOT}/.nodectl.run</code> manually.</p>
+
+<p><code>${PROJECT_ROOT}/.nodectl.run</code> use for app state management.</p>
+
+<h2>
+<a name="synopsis---actions" class="anchor" href="#synopsis---actions"><span class="octicon octicon-link"></span></a>Synopsis - actions</h2>
+
+<p>current working directory should be under the project root.</p>
+
+<h3>
+<a name="show-help-and-exit" class="anchor" href="#show-help-and-exit"><span class="octicon octicon-link"></span></a>show help and exit</h3>
+
+<pre><code>nodectl -h
 nodectl --help
-</pre></div>
+</code></pre>
 
-<h2>
-<a name="start-application" class="anchor" href="#start-application"><span class="octicon octicon-link"></span></a>start application</h2>
+<h3>
+<a name="show-version-and-exit" class="anchor" href="#show-version-and-exit"><span class="octicon octicon-link"></span></a>show version and exit</h3>
 
-<ul>
-<li>run nodejs application</li>
-<li>
-<code>coffee-script</code> executable</li>
-</ul><div class="highlight"><pre>nodectl start app.js
+<pre><code>nodectl -v
+nodectl --version
+</code></pre>
+
+<h3>
+<a name="start-application" class="anchor" href="#start-application"><span class="octicon octicon-link"></span></a>start application</h3>
+
+<p>default action, only <code>javascript</code> or <code>coffee-script</code> runnable.</p>
+
+<pre><code>nodectl start app.js
 nodectl app.js
 nodectl app.coffee
-</pre></div>
-
-<ul>
-<li>Default action is <code>start</code>
-</li>
-<li>Default application detect from <code>package.json</code> keyname <code>main</code>
-</li>
-<li>Default application detect from <code>.nodectl.json</code> keyname <code>main</code>
-</li>
-</ul><h2>
-<a name="stop-application" class="anchor" href="#stop-application"><span class="octicon octicon-link"></span></a>stop application</h2>
-
-<ul>
-<li>send <code>SIGINT</code> to application process</li>
-</ul><div class="highlight"><pre>nodectl stop app.js
-</pre></div>
-
-<h2>
-<a name="restart-application" class="anchor" href="#restart-application"><span class="octicon octicon-link"></span></a>restart application</h2>
-
-<ul>
-<li>restart application master process</li>
-</ul><div class="highlight"><pre>nodectl restart app.js
-</pre></div>
-
-<h2>
-<a name="reload-application" class="anchor" href="#reload-application"><span class="octicon octicon-link"></span></a>reload application</h2>
-
-<ul>
-<li>restart only application child processes</li>
-</ul><div class="highlight"><pre>nodectl reload app.js
-</pre></div>
-
-<h2>
-<a name="check-application-status" class="anchor" href="#check-application-status"><span class="octicon octicon-link"></span></a>check application status</h2>
-
-<ul>
-<li>application running or not</li>
-</ul><div class="highlight"><pre>nodectl status app.js
-</pre></div>
-
-<h2>
-<a name="force-clear-pid" class="anchor" href="#force-clear-pid"><span class="octicon octicon-link"></span></a>force-clear pid</h2>
-
-<ul>
-<li>fix a problem application not running but <code>nodectl start</code> saids <code>already running</code>
-</li>
-</ul><div class="highlight"><pre>nodectl force-clear app.js
-</pre></div>
-
-<h1>
-<a name="synopsis---option" class="anchor" href="#synopsis---option"><span class="octicon octicon-link"></span></a>Synopsis - Option:</h1>
-
-<h2>
-<a name="-p---port" class="anchor" href="#-p---port"><span class="octicon octicon-link"></span></a><code>-p</code>, <code>--port</code>
-</h2>
-
-<ul>
-<li>set listening port with <code>process.env.PORT</code>
-</li>
-<li>default <code>3000</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -p 3000
-</pre></div>
-
-<h2>
-<a name="-e---env" class="anchor" href="#-e---env"><span class="octicon octicon-link"></span></a><code>-e</code>, <code>--env</code>
-</h2>
-
-<ul>
-<li>set application environment with <code>process.env.NODE_ENV</code>
-</li>
-<li>default <code>development</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -e production
-</pre></div>
-
-<h2>
-<a name="-c---cluster" class="anchor" href="#-c---cluster"><span class="octicon octicon-link"></span></a><code>-c</code>, <code>--cluster</code>
-</h2>
-
-<ul>
-<li>concurrent application child process</li>
-<li>nodectl uses <code>cluster</code> native module forking with</li>
-<li>default cpu thread length</li>
-</ul><div class="highlight"><pre>nodectl start app.js -c 1
-</pre></div>
-
-<h2>
-<a name="-d---daemon" class="anchor" href="#-d---daemon"><span class="octicon octicon-link"></span></a><code>-d</code>, <code>--daemon</code>
-</h2>
-
-<ul>
-<li>daemonize application</li>
-<li>default <code>false</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -d
-</pre></div>
-
-<h2>
-<a name="-w---watch" class="anchor" href="#-w---watch"><span class="octicon octicon-link"></span></a><code>-w</code>, <code>--watch</code>
-</h2>
-
-<ul>
-<li>watch code changes, auto reload programs</li>
-<li>default <code>false</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -w
-</pre></div>
-
-<h2>
-<a name="-d---delay" class="anchor" href="#-d---delay"><span class="octicon octicon-link"></span></a><code>-D</code>, <code>--delay</code>
-</h2>
-
-<ul>
-<li>on reload, set interval time(ms) for children re-fork</li>
-<li>default <code>250</code>
-</li>
-</ul><div class="highlight"><pre>nodectl restart app.js -D 1000
-</pre></div>
-
-<h2>
-<a name="-n---nocolor" class="anchor" href="#-n---nocolor"><span class="octicon octicon-link"></span></a><code>-n</code>, <code>--nocolor</code>
-</h2>
-
-<ul>
-<li>stop colorize console</li>
-<li>nodectl defaults colorize <code>console.{log,info,warn,error}</code>
-</li>
-<li>default <code>false</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -n
-</pre></div>
-
-<h2>
-<a name="-p---pidpath" class="anchor" href="#-p---pidpath"><span class="octicon octicon-link"></span></a><code>-P</code>, <code>--pidpath</code>
-</h2>
-
-<ul>
-<li>specified the directory pid file will be placed</li>
-<li>default <code>\</code>which nodectl`/../tmp/${APPNAME}.pid`</li>
-</ul><div class="highlight"><pre>nodectl start app.js -P tmp
-</pre></div>
-
-<h2>
-<a name="-l---logpath" class="anchor" href="#-l---logpath"><span class="octicon octicon-link"></span></a><code>-l</code>, <code>--logpath</code>
-</h2>
-
-<ul>
-<li>specified the directory log files will be placed</li>
-<li>default <code>null</code> (no log)</li>
-</ul><div class="highlight"><pre>nodectl start app.js -l tmp
-</pre></div>
-
-<h2>
-<a name="-x---execmaster" class="anchor" href="#-x---execmaster"><span class="octicon octicon-link"></span></a><code>-x</code>, <code>--execmaster</code>
-</h2>
-
-<ul>
-<li>execute script with master process context</li>
-<li>script will be spawn in order to prevent a master process down</li>
-<li>specifiable <code>coffee-script</code>
-</li>
-<li>default <code>null</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -x script/cron.js
-</pre></div>
-
-<h2>
-<a name="-a---assets" class="anchor" href="#-a---assets"><span class="octicon octicon-link"></span></a><code>-a</code>, <code>--assets</code>
-</h2>
-
-<ul>
-<li>see the following section</li>
-</ul><h2>
-<a name="-o---output" class="anchor" href="#-o---output"><span class="octicon octicon-link"></span></a><code>-o</code>, <code>--output</code>
-</h2>
-
-<ul>
-<li>watch assets changes, auto compile</li>
-<li>assets directory specified with <code>-a</code>
-</li>
-<li>output directory specified with <code>-o</code>
-</li>
-<li>
-<code>-a</code> and <code>-o</code>, both are required to perform correctly</li>
-<li>css, <a href="http://learnboost.github.io/stylus/">styl</a>, js, <a href="http://coffeescript.org">coffee</a>, html, <a href="http://jade-lang.com">jade</a> enable</li>
-<li>keeping directory structure and file name</li>
-<li>default <code>null</code>
-</li>
-</ul><div class="highlight"><pre>nodectl start app.js -a assets -o public
-</pre></div>
-
-<h4>
-<a name="compile-from" class="anchor" href="#compile-from"><span class="octicon octicon-link"></span></a>compile from:</h4>
-
-<pre><code>assets
- `- css
-     `- style.styl
- `- js
-     `- script.coffee
 </code></pre>
 
-<h4>
-<a name="compile-to" class="anchor" href="#compile-to"><span class="octicon octicon-link"></span></a>compile to:</h4>
+<h3>
+<a name="stop-application" class="anchor" href="#stop-application"><span class="octicon octicon-link"></span></a>stop application</h3>
 
-<pre><code>public
- `- css
-     `- style.css
- `- js
-     `- script.js
+<pre><code>nodectl stop
+</code></pre>
+
+<h3>
+<a name="restart-application" class="anchor" href="#restart-application"><span class="octicon octicon-link"></span></a>restart application</h3>
+
+<p>restart application workers</p>
+
+<pre><code>nodectl restart app.js
+</code></pre>
+
+<h3>
+<a name="check-application-status" class="anchor" href="#check-application-status"><span class="octicon octicon-link"></span></a>check application status</h3>
+
+<pre><code>nodectl status app.js
 </code></pre>
 
 <h2>
-<a name="-m---minify" class="anchor" href="#-m---minify"><span class="octicon octicon-link"></span></a><code>-m</code>, <code>--minify</code>
-</h2>
+<a name="synopsis---options" class="anchor" href="#synopsis---options"><span class="octicon octicon-link"></span></a>Synopsis - options</h2>
 
-<ul>
-<li>minify compiled assets</li>
-</ul><div class="highlight"><pre>nodectl start app.js -a assets -o public -m
-</pre></div>
+<h3>
+<a name="-p---port" class="anchor" href="#-p---port"><span class="octicon octicon-link"></span></a>-p, --port</h3>
+
+<p>set listening port with <code>process.env.PORT</code></p>
+
+<pre><code>nodectl app.js -p 3000
+</code></pre>
+
+<h3>
+<a name="-e---env" class="anchor" href="#-e---env"><span class="octicon octicon-link"></span></a>-e, --env</h3>
+
+<p>set application environment with <code>process.env.NODE_ENV</code></p>
+
+<pre><code>nodectl app.js -e production
+</code></pre>
+
+<h3>
+<a name="-c---cluster" class="anchor" href="#-c---cluster"><span class="octicon octicon-link"></span></a>-c, --cluster</h3>
+
+<p>number of process concurrents</p>
+
+<pre><code>nodectl app.js -c 1
+</code></pre>
+
+<h3>
+<a name="-d---delay" class="anchor" href="#-d---delay"><span class="octicon octicon-link"></span></a>-d, --delay</h3>
+
+<p>interval time on forking worker</p>
+
+<pre><code>nodectl app.js -d 250
+</code></pre>
+
+<h3>
+<a name="-s---setenv" class="anchor" href="#-s---setenv"><span class="octicon octicon-link"></span></a>-s, --setenv</h3>
+
+<p>set custom envs</p>
+
+<pre><code>nodectl app.js -s ROOTDIR=/opt -s COEFFICIENT=3.6
+</code></pre>
+
+<h3>
+<a name="-x---exec" class="anchor" href="#-x---exec"><span class="octicon octicon-link"></span></a>-x, --exec</h3>
+
+<p>execute job script on launch</p>
+
+<pre><code>nodectl app.js -x clock.js
+</code></pre>
+
+<h3>
+<a name="-l---log" class="anchor" href="#-l---log"><span class="octicon octicon-link"></span></a>-l, --log</h3>
+
+<p>logs stdout and stderr to file</p>
+
+<pre><code>nodectl app.js -l app.log
+</code></pre>
+
+<h3>
+<a name="-1---stdout" class="anchor" href="#-1---stdout"><span class="octicon octicon-link"></span></a>-1, --stdout</h3>
+
+<p>overwrite stdout log file</p>
+
+<pre><code>nodectl app.js -1 app.out
+</code></pre>
+
+<p><code>app.log</code> logs stderr only:</p>
+
+<pre><code>nodectl app.js -l app.log -1 app.out
+</code></pre>
+
+<h3>
+<a name="-2---stderr" class="anchor" href="#-2---stderr"><span class="octicon octicon-link"></span></a>-2, --stderr</h3>
+
+<p>overwrite stderr log file</p>
+
+<pre><code>nodectl app.js -2 app.err
+</code></pre>
+
+<h3>
+<a name="-a---assets" class="anchor" href="#-a---assets"><span class="octicon octicon-link"></span></a>-a, --assets</h3>
+
+<p>set asset directory <strong>Note:</strong> required -o option</p>
+
+<p>compiles automatically on change assets</p>
+
+<p>compilable: js, css, html, coffee, stylus, jade</p>
+
+<pre><code>nodectl app.js -a assets -o public
+</code></pre>
+
+<h3>
+<a name="-o---output" class="anchor" href="#-o---output"><span class="octicon octicon-link"></span></a>-o, --output</h3>
+
+<p>set output directory <strong>Note:</strong> required -a option</p>
+
+<p>compiles automatically on change assets</p>
+
+<pre><code>nodectl app.js -a assets -o public
+</code></pre>
+
+<h3>
+<a name="-m---minify" class="anchor" href="#-m---minify"><span class="octicon octicon-link"></span></a>-M, --minify</h3>
+
+<p>minify code on compiles assets</p>
+
+<pre><code>nodectl app.js -M -a assets -o public
+</code></pre>
+
+<h3>
+<a name="-d---daemon" class="anchor" href="#-d---daemon"><span class="octicon octicon-link"></span></a>-D, --daemon</h3>
+
+<p>daemonize app</p>
+
+<pre><code>nodectl app.js -D
+</code></pre>
+
+<h3>
+<a name="-w---watch" class="anchor" href="#-w---watch"><span class="octicon octicon-link"></span></a>-W, --watch</h3>
+
+<p>watch code changes, auto reload scripts</p>
+
+<pre><code>nodectl app.js -W
+</code></pre>
+
+<h3>
+<a name="-n---nocolor" class="anchor" href="#-n---nocolor"><span class="octicon octicon-link"></span></a>-N, --nocolor</h3>
+
+<p>stop colorize console</p>
+
+<pre><code>nodectl app.js -N
+</code></pre>
+
+<h3>
+<a name="--debug" class="anchor" href="#--debug"><span class="octicon octicon-link"></span></a>--debug</h3>
+
+<p>show debug info</p>
+
+<pre><code>nodectl app.js --debug
+</code></pre>
+
+<p><a name="Recipes"></a></p>
 
 <h2>
-<a name="-v---verbose" class="anchor" href="#-v---verbose"><span class="octicon octicon-link"></span></a><code>-V</code>, <code>--verbose</code>
-</h2>
+<a name="recipes" class="anchor" href="#recipes"><span class="octicon octicon-link"></span></a>Recipes</h2>
 
-<ul>
-<li>show verbose information</li>
-</ul><div class="highlight"><pre>nodectl start app.js -V
-</pre></div>
+<h3>
+<a name="project-on-development" class="anchor" href="#project-on-development"><span class="octicon octicon-link"></span></a>Project on Development</h3>
 
-<h2>
-<a name="-v---version" class="anchor" href="#-v---version"><span class="octicon octicon-link"></span></a><code>-v</code>, <code>--version</code>
-</h2>
+<h4>
+<a name="nodectljson-1" class="anchor" href="#nodectljson-1"><span class="octicon octicon-link"></span></a>.nodectl.json</h4>
 
-<ul>
-<li>show <code>nodectl</code> version info</li>
-</ul><h1>
-<a name="recipes" class="anchor" href="#recipes"><span class="octicon octicon-link"></span></a>Recipes:</h1>
+<pre><code>{
+  "main": "app.coffee",
+  "env": "development",
+  "cluster": 1,
+  "watch": true,
+  "assets": "assets",
+  "output": "public",
+  "minify": true
+}
+</code></pre>
 
-<ul>
-<li>nodectl behavior can be changed by editing a <code>.nodectl.json</code> file.</li>
-<li>
-<code>.nodectl.json</code> should be placed in PROJECT_ROOT</li>
-</ul><h2>
-<a name="project-on-development" class="anchor" href="#project-on-development"><span class="octicon octicon-link"></span></a>project on development</h2>
+<h4>
+<a name="equals-to" class="anchor" href="#equals-to"><span class="octicon octicon-link"></span></a>equals to</h4>
 
-<div class="highlight"><pre><span class="p">{</span>
-  <span class="nt">"main"</span><span class="p">:</span> <span class="s2">"app.coffee"</span><span class="p">,</span>
-  <span class="nt">"env"</span><span class="p">:</span> <span class="s2">"development"</span><span class="p">,</span>
-  <span class="nt">"cluster"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
-  <span class="nt">"watch"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"assete"</span><span class="p">:</span> <span class="s2">"assets"</span><span class="p">,</span>
-  <span class="nt">"output"</span><span class="p">:</span> <span class="s2">"public"</span><span class="p">,</span>
-  <span class="nt">"minify"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"daemon"</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
-  <span class="nt">"pidpath"</span><span class="p">:</span> <span class="s2">"tmp"</span><span class="p">,</span>
-  <span class="nt">"logpath"</span><span class="p">:</span> <span class="s2">"tmp"</span><span class="p">,</span>
-  <span class="nt">"verbose"</span><span class="p">:</span> <span class="kc">true</span>
-<span class="p">}</span>
-</pre></div>
+<pre><code>nodectl start app.coffee -e development -c 1 -W -a assets -o public -M
+</code></pre>
 
-<h2>
-<a name="project-on-production" class="anchor" href="#project-on-production"><span class="octicon octicon-link"></span></a>project on production</h2>
+<h4>
+<a name="start-app" class="anchor" href="#start-app"><span class="octicon octicon-link"></span></a>start app</h4>
 
-<div class="highlight"><pre><span class="p">{</span>
-  <span class="nt">"main"</span><span class="p">:</span> <span class="s2">"app.coffee"</span><span class="p">,</span>
-  <span class="nt">"env"</span><span class="p">:</span> <span class="s2">"production"</span><span class="p">,</span>
-  <span class="nt">"assete"</span><span class="p">:</span> <span class="s2">"assets"</span><span class="p">,</span>
-  <span class="nt">"output"</span><span class="p">:</span> <span class="s2">"public"</span><span class="p">,</span>
-  <span class="nt">"minify"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"daemon"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"pidpath"</span><span class="p">:</span> <span class="s2">"tmp"</span><span class="p">,</span>
-  <span class="nt">"logpath"</span><span class="p">:</span> <span class="s2">"tmp"</span>
-<span class="p">}</span>
-</pre></div>
+<pre><code>cd $PROJECT_ROOT
+nodectl
+</code></pre>
+
+<h3>
+<a name="project-on-production" class="anchor" href="#project-on-production"><span class="octicon octicon-link"></span></a>Project on Production</h3>
+
+<h4>
+<a name="nodectljson-2" class="anchor" href="#nodectljson-2"><span class="octicon octicon-link"></span></a>.nodectl.json</h4>
+
+<pre><code>{
+  "main": "app.coffee",
+  "env": "production",
+  "assets": "assets",
+  "output": "public",
+  "minify": true,
+  "daemon": true
+}
+</code></pre>
+
+<h4>
+<a name="equals-to-1" class="anchor" href="#equals-to-1"><span class="octicon octicon-link"></span></a>equals to</h4>
+
+<pre><code>nodectl start app.coffee -e production -a assets -o output -M -D
+</code></pre>
+
+<h3>
+<a name="set-environment" class="anchor" href="#set-environment"><span class="octicon octicon-link"></span></a>Set Environment</h3>
+
+<h4>
+<a name="nodectljson-3" class="anchor" href="#nodectljson-3"><span class="octicon octicon-link"></span></a>.nodectl.json</h4>
+
+<pre><code>{
+  "main": "app.coffee",
+  "assets": "assets",
+  "output": "public",
+  "minify": true,
+  "setenv": {
+    "ROOTDIR": "/opt",
+    "COEFFICIENT": 3.6
+  }
+}
+</code></pre>
+
+<h4>
+<a name="equals-to-2" class="anchor" href="#equals-to-2"><span class="octicon octicon-link"></span></a>equals to</h4>
+
+<pre><code>nodectl start app.coffee -a assets -o output -M -s ROOTDIR=/opt -s COEFFICIENT=3.6
+</code></pre>
 
 <h2>
 <a name="crontab-action" class="anchor" href="#crontab-action"><span class="octicon octicon-link"></span></a>crontab action</h2>
 
 <ul>
-<li>use <code>--execmaster</code>
+<li>use <code>--exec</code>
 </li>
 </ul><h4>
 <a name="scriptcoffee" class="anchor" href="#scriptcoffee"><span class="octicon octicon-link"></span></a>script.coffee</h4>
 
-<div class="highlight"><pre><span class="nx">setInterval</span> <span class="nf">-&gt;</span>
-  <span class="o">/*</span> <span class="nx">some</span> <span class="nx">action</span> <span class="o">*/</span>
-<span class="p">,</span> <span class="mi">5000</span>
-</pre></div>
+<pre><code>setInterval -&gt;
+  /* some action */
+, 5000
+</code></pre>
 
 <h4>
-<a name="nodectjson" class="anchor" href="#nodectjson"><span class="octicon octicon-link"></span></a>.nodect.json</h4>
+<a name="nodectljson-4" class="anchor" href="#nodectljson-4"><span class="octicon octicon-link"></span></a>.nodectl.json</h4>
 
-<div class="highlight"><pre><span class="p">{</span>
-  <span class="nt">"main"</span><span class="p">:</span> <span class="s2">"app.coffee"</span><span class="p">,</span>
-  <span class="nt">"env"</span><span class="p">:</span> <span class="s2">"production"</span><span class="p">,</span>
-  <span class="nt">"assete"</span><span class="p">:</span> <span class="s2">"assets"</span><span class="p">,</span>
-  <span class="nt">"output"</span><span class="p">:</span> <span class="s2">"public"</span><span class="p">,</span>
-  <span class="nt">"minify"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"daemon"</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
-  <span class="nt">"pidpath"</span><span class="p">:</span> <span class="s2">"tmp"</span><span class="p">,</span>
-  <span class="nt">"logpath"</span><span class="p">:</span> <span class="s2">"tmp"</span><span class="p">,</span>
-  <span class="nt">"execmaster"</span><span class="p">:</span> <span class="s2">"script.coffee"</span>
-<span class="p">}</span>
-</pre></div>
+<pre><code>{
+  "main": "app.coffee",
+  "env": "production",
+  "assete": "assets",
+  "output": "public",
+  "minify": true,
+  "daemon": true,
+  "exec": "script.coffee"
+}
+</code></pre>
+
+<h2>
+<a name="mit-license" class="anchor" href="#mit-license"><span class="octicon octicon-link"></span></a>MIT LICENSE</h2>
+
+<p>Copyright © 2013 geta6 licensed under <a href="http://opensource.org/licenses/MIT">MIT</a></p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/geta6">geta6</a></p>
