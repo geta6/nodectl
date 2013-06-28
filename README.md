@@ -2,6 +2,10 @@
 
 A simple CLI tool for ensuring that a given node.js application runs conveniently and continuously.
 
+## Updates
+
+`v0.3.x`: change options
+
 ## Features
 
 * start-stop interface
@@ -59,230 +63,15 @@ Options:
     --debug       : show debug information
 ```
 
-## Synopsis
+## Requirement
 
-### show help
+nodectl requires `package.json` includes the key named __name__ and __version__.
 
-```
-nodectl -h
-nodectl --help
-```
+`<script>` is omissible if the key named __main__ exists in either `package.json` or `.nodectl.json`.
 
-### start application
+### .nodectl.json
 
-* default action, only `javascript` or `coffee-script` runnable.
-
-```
-nodectl start app.js
-nodectl app.js
-nodectl app.coffee
-```
-
-### stop application
-
-* stop
-
-```sh
-nodectl stop app.js
-```
-
-## restart application
-
-* restart application master process
-
-```sh
-nodectl restart app.js
-```
-
-## reload application
-
-* restart only application child processes
-
-```sh
-nodectl reload app.js
-```
-
-## check application status
-
-* application running or not
-
-```sh
-nodectl status app.js
-```
-
-## force-clear pid
-
-* fix a problem application not running but `nodectl start` saids `already running`
-
-```sh
-nodectl force-clear app.js
-```
-
-# Synopsis - Option:
-
-## `-p`, `--port`
-
-* set listening port with `process.env.PORT`
-* default `3000`
-
-```sh
-nodectl start app.js -p 3000
-```
-
-## `-e`, `--env`
-
-* set application environment with `process.env.NODE_ENV`
-* default `development`
-
-```sh
-nodectl start app.js -e production
-```
-
-## `-c`, `--cluster`
-
-* concurrent application child process
-* nodectl uses `cluster` native module forking with
-* default cpu thread length
-
-```sh
-nodectl start app.js -c 1
-```
-
-## `-d`, `--daemon`
-
-* daemonize application
-* default `false`
-
-```sh
-nodectl start app.js -d
-```
-
-## `-w`, `--watch`
-
-* watch code changes, auto reload programs
-* default `false`
-
-```sh
-nodectl start app.js -w
-```
-
-## `-D`, `--delay`
-
-* on reload, set interval time(ms) for children re-fork
-* default `250`
-
-```sh
-nodectl restart app.js -D 1000
-```
-
-## `-n`, `--nocolor`
-
-* stop colorize console
-* nodectl defaults colorize `console.{log,info,warn,error}`
-* default `false`
-
-```sh
-nodectl start app.js -n
-```
-
-## `-P`, `--pidpath`
-
-* specified the directory pid file will be placed
-* default `\`which nodectl\`/../tmp/${APPNAME}.pid`
-
-```sh
-nodectl start app.js -P tmp
-```
-
-## `-l`, `--logpath`
-
-* specified the directory log files will be placed
-* default `null` (no log)
-
-```sh
-nodectl start app.js -l tmp
-```
-
-## `-x`, `--execmaster`
-
-* execute script with master process context
-* script will be spawn in order to prevent a master process down
-* specifiable `coffee-script`
-* default `null`
-
-```sh
-nodectl start app.js -x script/cron.js
-```
-
-## `-a`, `--assets`
-
-* see the following section
-
-## `-o`, `--output`
-
-* watch assets changes, auto compile
-* assets directory specified with `-a`
-* output directory specified with `-o`
-* `-a` and `-o`, both are required to perform correctly
-* css, [styl](http://learnboost.github.io/stylus/), js, [coffee](http://coffeescript.org), html, [jade](http://jade-lang.com) enable
-* keeping directory structure and file name
-* default `null`
-
-```sh
-nodectl start app.js -a assets -o public
-```
-
-#### compile from:
-
-```
-assets
- `- css
-     `- style.styl
- `- js
-     `- script.coffee
-```
-
-#### compile to:
-
-```
-public
- `- css
-     `- style.css
- `- js
-     `- script.js
-```
-
-## `-m`, `--minify`
-
-* minify compiled assets
-
-```sh
-nodectl start app.js -a assets -o public -m
-```
-
-## `-V`, `--verbose`
-
-* show verbose information
-
-```sh
-nodectl start app.js -V
-```
-
-## `-v`, `--version`
-
-* show `nodectl` version info
-
-
-
-## Parameter
-
-### .nodectl.json, package.json
-
-The key named __name__ and __version__ are required in either `package.json` or `.nodectl.json`.
-
-`<program>` is omissible if the key named __main__ exists in either `package.json` or `.nodectl.json`.
-
-`[options]` is omissible if the key __long-option-named__ exists in either `package.json` or `.nodectl.json`.
+When `.nodectl.json` is placed in `PROJECT_ROOT`, load the value for key named __long-option-name__ and set to a `[options]` default value.
 
 See [Recipes](#Recipes) section for how to write json file.
 
@@ -292,64 +81,279 @@ Do not touch `${PROJECT_ROOT}/.nodectl.run` manually.
 
 `${PROJECT_ROOT}/.nodectl.run` use for app state management.
 
+## Synopsis - actions
 
+current working directory should be under the project root.
 
+### show help and exit
 
+```
+nodectl -h
+nodectl --help
+```
+
+### show version and exit
+
+```
+nodectl -v
+nodectl --version
+```
+
+### start application
+
+default action, only `javascript` or `coffee-script` runnable.
+
+```
+nodectl start app.js
+nodectl app.js
+nodectl app.coffee
+```
+
+### stop application
+
+```
+nodectl stop
+```
+
+### restart application
+
+restart application workers
+
+```
+nodectl restart app.js
+```
+
+### check application status
+
+```
+nodectl status app.js
+```
+
+## Synopsis - options
+
+### -p, --port
+
+set listening port with `process.env.PORT`
+
+```
+nodectl app.js -p 3000
+```
+
+### -e, --env
+
+set application environment with `process.env.NODE_ENV`
+
+```
+nodectl app.js -e production
+```
+
+### -c, --cluster
+
+number of process concurrents
+
+```
+nodectl app.js -c 1
+```
+
+### -d, --delay
+
+interval time on forking worker
+
+```
+nodectl app.js -d 250
+```
+
+### -s, --setenv
+
+set custom envs
+
+```
+nodectl app.js -s ROOTDIR=/opt -s COEFFICIENT=3.6
+```
+
+### -x, --exec
+
+execute job script on launch
+
+```
+nodectl app.js -x clock.js
+```
+
+### -l, --log
+
+logs stdout and stderr to file
+
+```
+nodectl app.js -l app.log
+```
+
+### -1, --stdout
+
+overwrite stdout log file
+
+```
+nodectl app.js -1 app.out
+```
+
+`app.log` logs stderr only:
+```
+nodectl app.js -l app.log -1 app.out
+```
+
+### -2, --stderr
+
+overwrite stderr log file
+
+```
+nodectl app.js -2 app.err
+```
+
+### -a, --assets
+
+set asset directory __Note:__ required -o option
+
+compiles automatically on change assets
+
+compilable: js, css, html, coffee, stylus, jade
+
+```
+nodectl app.js -a assets -o public
+```
+
+### -o, --output
+
+set output directory __Note:__ required -a option
+
+compiles automatically on change assets
+
+```
+nodectl app.js -a assets -o public
+```
+
+### -M, --minify
+
+minify code on compiles assets
+
+```
+nodectl app.js -M -a assets -o public
+```
+
+### -D, --daemon
+
+daemonize app
+
+```
+nodectl app.js -D
+```
+
+### -W, --watch
+
+watch code changes, auto reload programs
+
+```
+nodectl app.js -W
+```
+
+### -N, --nocolor
+
+stop colorize console
+
+```
+nodectl app.js -N
+```
+
+### --debug
+
+show debug info
+
+```
+nodectl app.js --debug
+```
 
 <a name='Recipes'></a>
-# Recipes:
+## Recipes
 
-* nodectl behavior can be changed by editing a `.nodectl.json` file.
-* `.nodectl.json` should be placed in PROJECT_ROOT
+### Project on Development
 
-## project on development
-
-```json
+#### .nodectl.json
+```
 {
   "main": "app.coffee",
   "env": "development",
-  "cluster": "1",
+  "cluster": 1,
   "watch": true,
-  "assete": "assets",
+  "assets": "assets",
   "output": "public",
-  "minify": true,
-  "daemon": false,
-  "pidpath": "tmp",
-  "logpath": "tmp",
-  "verbose": true
+  "minify": true
 }
 ```
+#### equals to
+```
+nodectl start app.coffee -e development -c 1 -W -a assets -o public -M
+```
 
-## project on production
+#### start app
 
-```json
+```
+cd $PROJECT_ROOT
+nodectl
+```
+
+
+### Project on Production
+
+#### .nodectl.json
+```
 {
   "main": "app.coffee",
   "env": "production",
-  "assete": "assets",
+  "assets": "assets",
   "output": "public",
   "minify": true,
-  "daemon": true,
-  "pidpath": "tmp",
-  "logpath": "tmp"
+  "daemon": true
 }
+```
+#### equals to
+```
+nodectl start app.coffee -e production -a assets -o output -M -D
+```
+
+### Set Environment
+
+#### .nodectl.json
+```
+{
+  "main": "app.coffee",
+  "assets": "assets",
+  "output": "public",
+  "minify": true,
+  "setenv": {
+    "ROOTDIR": "/opt",
+    "COEFFICIENT": 3.6
+  }
+}
+```
+
+#### equals to
+```
+nodectl start app.coffee -a assets -o output -M -s ROOTDIR=/opt -s COEFFICIENT=3.6
 ```
 
 ## crontab action
 
-* use `--execmaster`
+* use `--exec`
 
 #### script.coffee
 
-```coffee
+```
 setInterval ->
   /* some action */
 , 5000
 ```
 
-#### .nodect.json
+#### .nodectl.json
 
-```json
+```
 {
   "main": "app.coffee",
   "env": "production",
@@ -357,9 +361,7 @@ setInterval ->
   "output": "public",
   "minify": true,
   "daemon": true,
-  "pidpath": "tmp",
-  "logpath": "tmp",
-  "execmaster": "script.coffee"
+  "exec": "script.coffee"
 }
 ```
 
