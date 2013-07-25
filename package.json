@@ -1,0 +1,34 @@
+{
+  "name": "nodectl",
+  "version": "0.3.11",
+  "description": "supervisor script for node.js",
+  "main": "lib/nodectl.js",
+  "bin": {
+    "nodectl": "./bin/nodectl"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geta6/nodectl"
+  },
+  "keywords": [
+    "supervisor",
+    "forever",
+    "daemon",
+    "cluster"
+  ],
+  "dependencies": {
+    "coffee-script": "1.6.3",
+    "stylus": "0.32.1",
+    "jade": "0.31.2",
+    "uglify-js": "2.3.6",
+    "sqwish": "0.2.1",
+    "html-minifier": "0.5.2",
+    "mkdirp": "0.3.5"
+  },
+  "author": "geta6",
+  "license": "BSD",
+  "readme": "http://geta6.github.io/nodectl/",
+  "bugs": {
+    "url": "https://github.com/geta6/nodectl/issues"
+  }
+}
