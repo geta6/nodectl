@@ -1,6 +1,6 @@
 {
   "name": "nodectl",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "supervisor script for node.js",
   "main": "lib/nodectl.js",
   "bin": {
@@ -17,13 +17,13 @@
     "cluster"
   ],
   "dependencies": {
-    "coffee-script": "1.6.3",
-    "stylus": "0.32.1",
-    "jade": "0.31.2",
-    "uglify-js": "2.3.6",
-    "sqwish": "0.2.1",
-    "html-minifier": "0.5.2",
-    "mkdirp": "0.3.5"
+    "coffee-script": "*",
+    "stylus": "*",
+    "jade": "*",
+    "uglify-js": "*",
+    "sqwish": "*",
+    "html-minifier": "*",
+    "mkdirp": "*"
   },
   "author": "geta6",
   "license": "BSD",
