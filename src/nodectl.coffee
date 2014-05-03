@@ -7,7 +7,7 @@ cluster = require 'cluster'
 {spawn} = require 'child_process'
 
 mkdirp = require 'mkdirp'
-coffee = require 'coffee-script'
+coffee = require 'coffee-script/register'
 stylus = require 'stylus'
 jade = require 'jade'
 uglify = require 'uglify-js'
